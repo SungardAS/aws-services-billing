@@ -1,0 +1,8 @@
+.DS_Store
+node_modules
+*.zip
+__*
+dist
+*.local.*
+samTemplate.yaml
+*.yaml1

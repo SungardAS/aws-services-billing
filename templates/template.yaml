@@ -1,0 +1,544 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: "AWS::Serverless-2016-10-31"
+Parameters:
+  VpcCidr:
+    Type: String
+    Default: "10.10.0.0/16"
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+    MaxLength: 18
+    MinLength: 9
+    Description: "VPC Cidr Block. Format: x.x.x.x/x"
+    ConstraintDescription: "must be a valid CIDR range formatted as x.x.x.x/x"
+  PublicCidr1:
+    Type: String
+    Default: "10.10.0.0/20"
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+    MaxLength: 18
+    MinLength: 9
+    Description: "First Public Cidr Block. Format: x.x.x.x/x"
+    ConstraintDescription: "must be a valid CIDR range formatted as x.x.x.x/x"
+  PublicCidr2:
+    Type: String
+    Default: "10.10.16.0/20"
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+    MaxLength: 18
+    MinLength: 9
+    Description: "Second Public Cidr Block. Format: x.x.x.x/x"
+    ConstraintDescription: "must be a valid CIDR range formatted as x.x.x.x/x"
+  PrivateCidr1:
+    Type: String
+    Default: "10.10.32.0/20"
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+    MaxLength: 18
+    MinLength: 9
+    Description: "First Private Cidr Block. Format: x.x.x.x/x"
+    ConstraintDescription: "must be a valid CIDR range formatted as x.x.x.x/x"
+  PrivateCidr2:
+    Type: String
+    Default: "10.10.48.0/20"
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+    MaxLength: 18
+    MinLength: 9
+    Description: "Second Private Cidr Block. Format: x.x.x.x/x"
+    ConstraintDescription: "must be a valid CIDR range formatted as x.x.x.x/x"
+  NameTag:
+    Type: String
+    Default: "redshift-vpc"
+    AllowedPattern: "[\\x20-\\x7E]*"
+    MaxLength: 255
+    MinLength: 1
+    Description: "Set the name tag for vpc."
+    ConstraintDescription: "can contain only ASCII characters."
+  RedshiftUser:
+    Type: String
+    Default: "billing"
+    Description: User Name for Redshift Cluster
+  RedshiftPass:
+    Type: String
+    NoEcho: true
+    Description: Password for Redshift Cluster. Password should be atleast 8 characters long.
+  RedshiftDatabase:
+    Type: String
+    Default: "billing"
+    Description: Database Name for Redshift Cluster.
+  RedshiftSnapshotIdentifier:
+    Type: String
+    Description: Identifier of Redshift Snapshot for Restoration.
+  RedshiftSnapshotClusterIdentifier:
+    Type: String
+    Description: Redshift Cluster Identifier of Source Snapshot. This must be specified if RedshiftSnapshotIdentifier is set.
+  AlarmThresholdNumber:
+    Type: Number
+    Default: 10
+    Description: Threshold Number for Alarms
+  AllowedUsagePercentage:
+    Type: Number
+    Default: 0.02
+    Description: Allowed Usage Percentage from Average of Previous Month Usages
+  PlotlyUsername:
+    Type: String
+    Description: Plotly Username
+  PlotlyAPIKey:
+    Type: String
+    NoEcho: true
+    Description: Plotly API Key
+Resources:
+  Vpc:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL: "./vpc.yaml"
+      Parameters:
+        VpcCidr: !Ref VpcCidr
+        CreateVpcSecurityGroup: false
+        OpenVpcCommunication: false
+        CreateInternetGateway: false
+        NameTag: !Ref NameTag
+  RouteTables:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL: "./route_tables.yaml"
+      Parameters:
+        NameTag: !Ref NameTag
+        VpcId: !Sub "${Vpc.Outputs.VpcId}"
+  PublicSubnet1:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL: "./subnet.yaml"
+      Parameters:
+        NameTag: !Join
+          - "."
+          - - !Ref NameTag
+            - "public.subnet.1"
+        AvailabilityZone: !Select [ 1, !GetAZs "" ]
+        VpcId: !Sub "${Vpc.Outputs.VpcId}"
+        SubnetCidr: !Ref PublicCidr1
+        RouteTableId: !Sub "${RouteTables.Outputs.RouteTableIdForPublicSubnets}"
+  PublicSubnet2:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL: "./subnet.yaml"
+      Parameters:
+        NameTag: !Join
+          - "."
+          - - !Ref NameTag
+            - "public.subnet.2"
+        AvailabilityZone: !Select [ 1, !GetAZs "" ]
+        VpcId: !Sub "${Vpc.Outputs.VpcId}"
+        SubnetCidr: !Ref PublicCidr2
+        RouteTableId: !Sub "${RouteTables.Outputs.RouteTableIdForPublicSubnets}"
+  PrivateSubnet1:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL: "./subnet.yaml"
+      Parameters:
+        NameTag: !Join
+          - "."
+          - - !Ref NameTag
+            - "private.subnet.1"
+        VpcId: !Sub "${Vpc.Outputs.VpcId}"
+        SubnetCidr: !Ref PrivateCidr1
+        AvailabilityZone: !Sub "${PublicSubnet1.Outputs.AvailabilityZone}"
+        RouteTableId: !Sub "${RouteTables.Outputs.RouteTableIdForPrivateSubnets}"
+  PrivateSubnet2:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL: "./subnet.yaml"
+      Parameters:
+        NameTag: !Join
+          - "."
+          - - !Ref NameTag
+            - "private.subnet.2"
+        VpcId: !Sub "${Vpc.Outputs.VpcId}"
+        SubnetCidr: !Ref PrivateCidr2
+        AvailabilityZone: !Sub "${PublicSubnet2.Outputs.AvailabilityZone}"
+        RouteTableId: !Sub "${RouteTables.Outputs.RouteTableIdForPrivateSubnets}"
+  SecurityGroups:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL: "./security_groups.yaml"
+      Parameters:
+        NameTag: !Ref NameTag
+        VpcId: !Sub "${Vpc.Outputs.VpcId}"
+  NatGateway:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL: "./nat_gateway.yaml"
+      Parameters:
+        PublicSubnetId: !Sub "${PublicSubnet1.Outputs.SubnetId}"
+        RouteTableId: !Sub "${RouteTables.Outputs.RouteTableIdForPrivateSubnets}"
+  RedshiftCluster:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL: "./redshift.yaml"
+      Parameters:
+        RedshiftUser: !Ref RedshiftUser
+        RedshiftPass: !Ref RedshiftPass
+        RedshiftDatabase: !Ref RedshiftDatabase
+        RedshiftSubnetId1: !Sub "${PrivateSubnet1.Outputs.SubnetId}"
+        RedshiftSubnetId2: !Sub "${PrivateSubnet2.Outputs.SubnetId}"
+        RedshiftSecurityGroupId: !Sub "${SecurityGroups.Outputs.RedshiftSecurityGroupId}"
+        RedshiftSnapshotIdentifier: !Ref RedshiftSnapshotIdentifier
+        RedshiftSnapshotClusterIdentifier: !Ref RedshiftSnapshotClusterIdentifier
+  BucketServiceIAMRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      Path: "/"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Sid: "AllowRedshiftServiceToAssumeRole"
+            Effect: "Allow"
+            Action:
+              - "sts:AssumeRole"
+            Principal:
+              Service:
+                - "redshift.amazonaws.com"
+  EncryptionDecryptionKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: "Encryption and Decryption key for Lambda"
+      KeyPolicy:
+        Id: "LambdaEncDec"
+        Version: "2012-10-17"
+        Statement:
+          -
+            Sid: "Allow administration of the key"
+            Effect: "Allow"
+            Action:
+              - "kms:*"
+            Principal:
+              AWS: !Ref AWS::AccountId
+            Resource: '*'
+          -
+            Sid: "Allow Encryption Service to use this key"
+            Effect: "Allow"
+            Action:
+              - "kms:Encrypt"
+            Principal:
+              AWS: !GetAtt LambdaFunctionIAMRole.Arn
+            Resource: '*'
+          -
+            Sid: "Allow Decryption Service to use this key"
+            Effect: "Allow"
+            Action:
+              - "kms:Decrypt"
+            Principal:
+              AWS: !GetAtt LambdaFunctionIAMRole.Arn
+            Resource: '*'
+          -
+            Sid: "Allow Decryption Service to use this key"
+            Effect: "Allow"
+            Action:
+              - "kms:Decrypt"
+            Principal:
+              AWS: !GetAtt AlertLambdaFunctionIAMRole.Arn
+            Resource: '*'
+  LambdaFunctionIAMRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      Path: "/"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Sid: "AllowLambdaServiceToAssumeRole"
+            Effect: "Allow"
+            Action:
+              - "sts:AssumeRole"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+      Policies:
+        -
+          PolicyName: "InlinePolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action:
+                  - "iam:*"
+                  - "kms:*"
+                  - "s3:*"
+                  - "sts:*"
+                  - "ec2:*"
+                Resource: "*"
+              -
+                Effect: "Allow"
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "arn:aws:logs:*:*:*"
+  ApiGatewayApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      DefinitionUri: ../swagger.yaml
+      StageName: Prod
+      Variables:
+        LambdaFunctionName: !Ref ProxyFunction
+  ProxyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      Runtime: nodejs4.3
+      CodeUri: ../src
+      Role: !GetAtt LambdaFunctionIAMRole.Arn
+      Timeout: 300
+      VpcConfig:
+        SecurityGroupIds:
+          - !Sub "${SecurityGroups.Outputs.RedshiftSecurityGroupId}"
+        SubnetIds:
+          - !Sub "${PrivateSubnet1.Outputs.SubnetId}"
+          - !Sub "${PrivateSubnet2.Outputs.SubnetId}"
+      Environment:
+        Variables:
+          REDSHIFT_CONNECTION_STRING: !Sub "${RedshiftCluster.Outputs.RedshiftConnectionString}"
+          REDSHIFT_USER: !Ref RedshiftUser
+          REDSHIFT_PASS: !Ref RedshiftPass
+          KMS_REGION: !Ref 'AWS::Region'
+          KMS_KEY_ID: !Ref EncryptionDecryptionKey
+      Events:
+        ProxyApiGreedy:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGatewayApi
+            Path: /{proxy+}
+            Method: ANY
+  ImportFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index_import.handler
+      Runtime: nodejs4.3
+      CodeUri: ../src
+      Role: !GetAtt LambdaFunctionIAMRole.Arn
+      Timeout: 300
+      VpcConfig:
+        SecurityGroupIds:
+          - !Sub "${SecurityGroups.Outputs.RedshiftSecurityGroupId}"
+        SubnetIds:
+          - !Sub "${PrivateSubnet1.Outputs.SubnetId}"
+          - !Sub "${PrivateSubnet2.Outputs.SubnetId}"
+      Environment:
+        Variables:
+          BUCKET_IAM_ROLE_ARN: !GetAtt BucketServiceIAMRole.Arn
+          BUCKET_REGION: !Ref 'AWS::Region'
+          REDSHIFT_CONNECTION_STRING: !Sub "${RedshiftCluster.Outputs.RedshiftConnectionString}"
+          REDSHIFT_USER: !Ref RedshiftUser
+          REDSHIFT_PASS: !Ref RedshiftPass
+          KMS_REGION: !Ref 'AWS::Region'
+          KMS_KEY_ID: !Ref EncryptionDecryptionKey
+      Events:
+        BillingDataUpload:
+          Type: S3
+          Properties:
+            Bucket: !Ref Bucket
+            Events: s3:ObjectCreated:*
+  Bucket:
+    Type: AWS::S3::Bucket
+  MetricsLambdaFunctionIAMRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      Path: "/"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Sid: "AllowLambdaServiceToAssumeRole"
+            Effect: "Allow"
+            Action:
+              - "sts:AssumeRole"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+      Policies:
+        -
+          PolicyName: "InlinePolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action:
+                  - "cloudwatch:*"
+                Resource: "*"
+              -
+                Effect: "Allow"
+                Action:
+                  - "sns:Publish"
+                Resource: "arn:aws:sns:*"
+              -
+                Effect: "Allow"
+                Action:
+                  - "lambda:InvokeFunction"
+                Resource: "*"
+              -
+                Effect: "Allow"
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "arn:aws:logs:*:*:*"
+  EstimatedAlarmsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index_estimated_alarms.handler
+      Runtime: nodejs4.3
+      CodeUri: ../src
+      Role: !GetAtt MetricsLambdaFunctionIAMRole.Arn
+      Timeout: 300
+      Environment:
+        Variables:
+          TOPIC_ARN_FOR_ALARMS: !Ref EstimatedChargesTopic
+      Events:
+        Scheduler:
+          Type: Schedule
+          Properties:
+            Schedule: rate(6 hours)
+  PercentageMetricsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index_percentage_metrics.handler
+      Runtime: nodejs4.3
+      CodeUri: ../src
+      Role: !GetAtt MetricsLambdaFunctionIAMRole.Arn
+      Timeout: 300
+      Environment:
+        Variables:
+          THRESHOLD_FOR_ALARMS: !Ref AlarmThresholdNumber
+          TOPIC_ARN_FOR_ALARMS: !Ref OverIncreasedPercentTopic
+      Events:
+        BillingMetricTopic:
+          Type: SNS
+          Properties:
+            Topic: !Ref EstimatedChargesTopic
+  EstimatedChargesTopic:
+    Type: AWS::SNS::Topic
+  AlertLambdaFunctionIAMRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      Path: "/"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Sid: "AllowLambdaServiceToAssumeRole"
+            Effect: "Allow"
+            Action:
+              - "sts:AssumeRole"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+      Policies:
+        -
+          PolicyName: "InlinePolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action:
+                  - "cloudwatch:*"
+                  - "ec2:*"
+                  - "s3:*"
+                Resource: "*"
+              -
+                Effect: "Allow"
+                Action:
+                  - "sns:Publish"
+                  - "kms:*"
+                Resource: "arn:aws:sns:*"
+              -
+                Effect: "Allow"
+                Action:
+                  - "dynamodb:GetItem"
+                  - "dynamodb:PutItem"
+                  - "dynamodb:Query"
+                Resource: "arn:aws:dynamodb:*"
+              -
+                Effect: "Allow"
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "arn:aws:logs:*:*:*"
+  AlertFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index_alert.handler
+      Runtime: nodejs4.3
+      CodeUri: ../src
+      Role: !GetAtt AlertLambdaFunctionIAMRole.Arn
+      Timeout: 300
+      VpcConfig:
+        SecurityGroupIds:
+          - !Sub "${SecurityGroups.Outputs.RedshiftSecurityGroupId}"
+        SubnetIds:
+          - !Sub "${PrivateSubnet1.Outputs.SubnetId}"
+          - !Sub "${PrivateSubnet2.Outputs.SubnetId}"
+      Environment:
+        Variables:
+          REDSHIFT_CONNECTION_STRING: !Sub "${RedshiftCluster.Outputs.RedshiftConnectionString}"
+          REDSHIFT_USER: !Ref RedshiftUser
+          REDSHIFT_PASS: !Ref RedshiftPass
+          ALLOWED_PERCENTAGE: !Ref AllowedUsagePercentage
+          S3_BUCKET_NAME: !Ref GraphImageBucket
+          PLOTLY_USERNAME: !Ref PlotlyUsername
+          PLOTLY_API_KEY: !Ref PlotlyAPIKey
+          DYNAMODB_ALERT_TABLE_NAME: !Ref Table
+          KMS_REGION: !Ref 'AWS::Region'
+          KMS_KEY_ID: !Ref EncryptionDecryptionKey
+      Events:
+        BillingAlertTopic:
+          Type: SNS
+          Properties:
+            Topic: !Ref OverIncreasedPercentTopic
+  GraphImageBucket:
+    Type: AWS::S3::Bucket
+  OverIncreasedPercentTopic:
+    Type: AWS::SNS::Topic
+  Table:
+    Type: AWS::Serverless::SimpleTable
+Outputs:
+  ApiUrl:
+    Description: URL of your API endpoint
+    Value: !Join
+      - ''
+      - - https://
+        - !Ref ApiGatewayApi
+        - '.execute-api.'
+        - !Ref 'AWS::Region'
+        - '.amazonaws.com/Prod'
+  ProxyLambdaFunctionArn:
+    Description: "Proxy Lambda Function ARN"
+    Value: !GetAtt ProxyFunction.Arn
+  EstimatedAlarmsLambdaFunctionArn:
+    Description: "Lambda Function ARN to Create Estimated Charges Alarams"
+    Value: !GetAtt EstimatedAlarmsFunction.Arn
+  PercentageMetricsLambdaFunctionArn:
+    Description: "Lambda Function ARN to Create Increased Percentages Metrics"
+    Value: !GetAtt PercentageMetricsFunction.Arn
+  AlertLambdaFunctionArn:
+    Description: "Alert Lambda Function ARN"
+    Value: !GetAtt AlertFunction.Arn
+  EncryptionDecryptionKeyId:
+    Description: "Encryption Decryption KMS Key Id"
+    Value: !Ref EncryptionDecryptionKey
+  EstimatedChargesTopicArn:
+    Description: "SNS Topic Arn for EstimatedCharges"
+    Value: !Ref EstimatedChargesTopic
+  OverIncreasedPercentTopicArn:
+    Description: "SNS Topic Arn for Over Increased Percent"
+    Value: !Ref OverIncreasedPercentTopic
+  BillingDataUploadBucketName:
+    Description: "Billing Data Upload Bucket Name"
+    Value: !Ref Bucket
+  BucketServiceIAMRoleNameForRedshift:
+    Description: "Name of IAM Role that permits Redshift to access S3 Bucket"
+    Value: !Ref BucketServiceIAMRole
+  GraphImageBucketBucketName:
+    Description: "Graph Image Bucket Bucket Name"
+    Value: !Ref GraphImageBucket

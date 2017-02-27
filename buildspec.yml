@@ -1,0 +1,21 @@
+version: 0.1
+phases:
+  install:
+    commands:
+      - pip install --upgrade --user awscli
+  build:
+    commands:
+      - npm install time
+      - sed -i "s/AWS::REGION/$AWS_DEFAULT_REGION/g" swagger.yaml
+      - sed -i "s/AWS::ACCOUNT_ID/$AWS_ACCOUNT_ID/g" swagger.yaml
+      - sed -i "s/AWS::CUSTOM_AUTHORIZER_LAMBDA_NAME/$CUSTOM_AUTHORIZER_LAMBDA_NAME/g" swagger.yaml
+      - sed -i "s/AWS::CUSTOM_AUTHORIZER_ROLE_NAME/$CUSTOM_AUTHORIZER_ROLE_NAME/g" swagger.yaml
+      - cd src; npm install; cd ..
+      - aws cloudformation package
+         --template-file ./templates/template.yaml
+         --s3-bucket $S3_BUCKET_NAME
+         --output-template-file samTemplate.yaml
+artifacts:
+  type: zip
+  files:
+    - samTemplate.yaml

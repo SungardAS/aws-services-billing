@@ -1,0 +1,53 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Conditions:
+ IsRedshiftSnapshotIdentifierNull: !Equals [!Ref RedshiftSnapshotIdentifier, ""]
+ IsRedshiftSnapshotClusterIdentifierNull: !Equals [!Ref RedshiftSnapshotClusterIdentifier, ""]
+Parameters:
+  RedshiftUser:
+    Type: String
+  RedshiftPass:
+    Type: String
+  RedshiftDatabase:
+    Type: String
+  RedshiftSubnetId1:
+    Type: String
+  RedshiftSubnetId2:
+    Type: String
+  RedshiftSecurityGroupId:
+    Type: String
+  RedshiftSnapshotIdentifier:
+    Type: String
+  RedshiftSnapshotClusterIdentifier:
+    Type: String
+Resources:
+  RedshiftClusterSubnetGroup:
+    Type: "AWS::Redshift::ClusterSubnetGroup"
+    Properties:
+      Description: Subnet Group for Redshift Cluster
+      SubnetIds:
+        - !Ref RedshiftSubnetId1
+        - !Ref RedshiftSubnetId2
+  RedshiftCluster:
+    Type: "AWS::Redshift::Cluster"
+    Properties:
+      DBName: !Ref RedshiftDatabase
+      MasterUsername: !Ref RedshiftUser
+      MasterUserPassword: !Ref RedshiftPass
+      NodeType: "dc1.large"
+      ClusterType: "single-node"
+      PubliclyAccessible: false
+      Encrypted: true
+      ClusterSubnetGroupName: !Ref RedshiftClusterSubnetGroup
+      VpcSecurityGroupIds:
+        - !Ref RedshiftSecurityGroupId
+      SnapshotIdentifier: !If [IsRedshiftSnapshotIdentifierNull, !Ref "AWS::NoValue", !Ref RedshiftSnapshotIdentifier]
+      SnapshotClusterIdentifier: !If [IsRedshiftSnapshotClusterIdentifierNull, !Ref "AWS::NoValue", !Ref RedshiftSnapshotClusterIdentifier]
+Outputs:
+  RedshiftConnectionString:
+    Value: !Join
+      - ''
+      - - !Sub "${RedshiftCluster.Endpoint.Address}"
+        - ':'
+        - !Sub "${RedshiftCluster.Endpoint.Port}"
+        - '/'
+        - !Ref RedshiftDatabase
