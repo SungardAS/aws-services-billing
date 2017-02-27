@@ -283,6 +283,7 @@ Resources:
   ProxyFunction:
     Type: AWS::Serverless::Function
     Properties:
+      FunctionName: SungardAS-Billing-Proxy
       Handler: index.handler
       Runtime: nodejs4.3
       CodeUri: ../src
@@ -311,6 +312,7 @@ Resources:
   ImportFunction:
     Type: AWS::Serverless::Function
     Properties:
+      FunctionName: SungardAS-Billing-Import
       Handler: index_import.handler
       Runtime: nodejs4.3
       CodeUri: ../src
@@ -385,6 +387,7 @@ Resources:
   EstimatedAlarmsFunction:
     Type: AWS::Serverless::Function
     Properties:
+      FunctionName: SungardAS-Billing-Estimated-Alarams
       Handler: index_estimated_alarms.handler
       Runtime: nodejs4.3
       CodeUri: ../src
@@ -401,6 +404,7 @@ Resources:
   PercentageMetricsFunction:
     Type: AWS::Serverless::Function
     Properties:
+      FunctionName: SungardAS-Billing-Percentage-Metrics
       Handler: index_percentage_metrics.handler
       Runtime: nodejs4.3
       CodeUri: ../src
@@ -468,6 +472,7 @@ Resources:
   AlertFunction:
     Type: AWS::Serverless::Function
     Properties:
+      FunctionName: SungardAS-Billing-Alert
       Handler: index_alert.handler
       Runtime: nodejs4.3
       CodeUri: ../src
