@@ -408,6 +408,11 @@ Resources:
       Timeout: 300
       Environment:
         Variables:
+          REDSHIFT_CONNECTION_STRING: !Sub "${RedshiftCluster.Outputs.RedshiftConnectionString}"
+          REDSHIFT_USER: !Ref RedshiftUser
+          REDSHIFT_PASS: !Ref RedshiftPass
+          KMS_REGION: !Ref 'AWS::Region'
+          KMS_KEY_ID: !Ref EncryptionDecryptionKey
           THRESHOLD_FOR_ALARMS: !Ref AlarmThresholdNumber
           TOPIC_ARN_FOR_ALARMS: !Ref OverIncreasedPercentTopic
       Events:
