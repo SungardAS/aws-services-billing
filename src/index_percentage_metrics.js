@@ -66,8 +66,9 @@ exports.handler = function (event, context) {
         // check the given EstimatedCharges with the average of previous months' charges
         // if the given Estimated Charges is below than (average+average*0.02), set the notification ON
         var average = findAccountAverage(data);
-        var percentage = ((average - curEstimatedChargesMetric.Maximum) / curEstimatedChargesMetric.Maximum) * 100;
-        metrics.addPercentageMetricData(accountId, region, percentage, curEstimatedChargesMetric.Maximum, curEstimatedChargesMetric.TimeStamp, function(err, metric) {
+        var percentage = ((curEstimatedChargesMetric.Maximum - average) / average) * 100;
+        //metrics.addPercentageMetricData(accountId, region, percentage, curEstimatedChargesMetric.Maximum, curEstimatedChargesMetric.TimeStamp, function(err, metric) {
+        metrics.addPercentageMetricData(accountId, region, percentage, average, curEstimatedChargesMetric.TimeStamp, function(err, metric) {
           if(err) {
             console.log("failed to addPercentageMetricData in account[" + accountId + "] : " + err);
             return context.fail(err, null);
