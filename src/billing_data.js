@@ -17,31 +17,21 @@ var startYearMonthStr = "201608";
 //var accountId = null;
 var connection = null;
 
-var querySum = "select lineItem_UsageAccountId, \
-  MAX(lineitem_usageenddate) enddate, \
-  to_char(sum(cast(lineItem_BlendedCost as float)), 'FM999990D00') blended, \
-  to_char(sum(cast(lineitem_unblendedcost as float)), 'FM999990D00') unblended \
-  from AWSBilling<year_month> \
-  where lineitem_usageenddate <= '<usage_end_date>' \
-  and lineitem_usageaccountid = '<account>' \
-  and datediff(hour,cast(lineitem_usagestartdate as datetime),cast(lineitem_usageenddate as datetime)) = 1 \
-  group by lineItem_UsageAccountId \
-  order by lineItem_UsageAccountId;"
-
-var queryServiceSum = "select lineItem_UsageAccountId, lineitem_productcode service, \
-  MAX(lineitem_usageenddate) enddate, \
-  to_char(sum(cast(lineItem_BlendedCost as float)), 'FM999990D00') blended, \
-  to_char(sum(cast(lineitem_unblendedcost as float)), 'FM999990D00') unblended \
-  from AWSBilling<year_month> \
-  where lineitem_usageenddate <= '<usage_end_date>' \
-  and lineitem_usageaccountid = '<account>' \
-  and datediff(hour,cast(lineitem_usagestartdate as datetime),cast(lineitem_usageenddate as datetime)) = 1 \
-  group by lineItem_UsageAccountId, lineitem_productcode \
-  order by lineItem_UsageAccountId, lineitem_productcode;"
-
 module.exports = {
 
   buildAccountData: function(params) {
+
+    var querySum = "select lineItem_UsageAccountId, \
+      MAX(lineitem_usageenddate) enddate, \
+      to_char(sum(cast(lineItem_BlendedCost as float)), 'FM999990D00') blended, \
+      to_char(sum(cast(lineitem_unblendedcost as float)), 'FM999990D00') unblended \
+      from AWSBilling<year_month> \
+      where lineitem_usageenddate <= '<usage_end_date>' \
+      and lineitem_usageaccountid = '<account>' \
+      and datediff(hour,cast(lineitem_usagestartdate as datetime),cast(lineitem_usageenddate as datetime)) = 1 \
+      group by lineItem_UsageAccountId \
+      order by lineItem_UsageAccountId;"
+
     var lastEndDate = new Date(params.metricData.Timestamp);
     var yearMonth = dateformat(lastEndDate, 'yyyymm');
     querySum = querySum.replace("<account>", params.accountId);
@@ -51,7 +41,7 @@ module.exports = {
       var prevMonthcount = 0;
       var monthData = findMonthDate(lastEndDate, prevMonthcount);
       while(monthData.year_month >= startYearMonthStr && prevMonthcount < PREVIOUS_MONTH_COUNT) {
-        promises.push(findMonthSum(monthData));
+        promises.push(findMonthSum(monthData, querySum));
         monthData = findMonthDate(lastEndDate, ++prevMonthcount);
       }
       return Promise.all(promises).then(function(retArray) {
@@ -69,6 +59,18 @@ module.exports = {
   },
 
   buildServiceData: function(params) {
+
+    var queryServiceSum = "select lineItem_UsageAccountId, lineitem_productcode service, \
+      MAX(lineitem_usageenddate) enddate, \
+      to_char(sum(cast(lineItem_BlendedCost as float)), 'FM999990D00') blended, \
+      to_char(sum(cast(lineitem_unblendedcost as float)), 'FM999990D00') unblended \
+      from AWSBilling<year_month> \
+      where lineitem_usageenddate <= '<usage_end_date>' \
+      and lineitem_usageaccountid = '<account>' \
+      and datediff(hour,cast(lineitem_usagestartdate as datetime),cast(lineitem_usageenddate as datetime)) = 1 \
+      group by lineItem_UsageAccountId, lineitem_productcode \
+      order by lineItem_UsageAccountId, lineitem_productcode;"
+
     var lastEndDate = new Date(params.metricData.Timestamp);
     var yearMonth = dateformat(lastEndDate, 'yyyymm');
     queryServiceSum = queryServiceSum.replace("<account>", params.accountId);
@@ -78,7 +80,7 @@ module.exports = {
       var prevMonthcount = 0;
       var monthData = findMonthDate(lastEndDate, prevMonthcount);
       while(monthData.year_month >= startYearMonthStr && prevMonthcount < PREVIOUS_MONTH_COUNT) {
-        promises.push(findMonthSumByService(monthData));
+        promises.push(findMonthSumByService(monthData, queryServiceSum));
         monthData = findMonthDate(lastEndDate, ++prevMonthcount);
       }
       return Promise.all(promises).then(function(retArray) {
@@ -124,7 +126,7 @@ function findMonthDate(dateStr, prevMonthcount) {
   return ret;
 }
 
-function findMonthSum(monthData) {
+function findMonthSum(monthData, querySum) {
   var querySumForMonth = querySum.replace("<year_month>", monthData.year_month).replace("<usage_end_date>", monthData.last_end_date);
   //console.log(querySumForMonth);
   return connection.query(querySumForMonth).then(function(result) {
@@ -134,7 +136,7 @@ function findMonthSum(monthData) {
   });
 }
 
-function findMonthSumByService(monthData) {
+function findMonthSumByService(monthData, queryServiceSum) {
   var queryServiceSumForMonth = queryServiceSum.replace("<year_month>", monthData.year_month).replace("<usage_end_date>", monthData.last_end_date);
   //console.log(queryServiceSumForMonth);
   return connection.query(queryServiceSumForMonth).then(function(result) {

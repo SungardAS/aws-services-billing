@@ -198,47 +198,67 @@ function Metrics() {
       input.metrics.sort(function(a, b){return b.Timestamp - a.Timestamp});
       callback(null, input.metrics.splice(0,1)[0]);
     }
+    function failed(input) { callback(null, false); }
+    function errored(err) { callback(err, null); };
 
-    me.accountId = accountId;
-    me.remoteInput.region = region;
-    me.remoteInput.metrics = null;
-    me.callback = callback;
-    if (current)  me.current = current;
+    //me.accountId = accountId;
+    //me.remoteInput.region = region;
+    //me.remoteInput.metrics = null;
+    //me.callback = callback;
+    //if (current)  me.current = current;
+    var input = {
+      region: region
+    };
+
+    var startTime = new Date(current.getFullYear(), current.getMonth(), current.getDate());
+    //me.current.setHours(me.current.getHours() - 1);
+    startTime.setHours(startTime.getHours() - 24*14);
+    var metricQuery = JSON.parse(JSON.stringify(me.AWSEstimatedChargesMetricQuery));
+    metricQuery.StartTime = startTime;
+    metricQuery.EndTime = current;
+    metricQuery.Dimensions[0].Value = accountId;
+    input.metricQuery = metricQuery;
 
     var flows = [
-      {func:buildEstimatedChargesMetricsData, success:aws_watch_remote.findMetricsStatistics, failure:failed, error:errored},
       {func:aws_watch_remote.findMetricsStatistics, success:succeeded, failure:failed, error:errored}
     ]
     aws_watch_remote.flows = flows;
 
-    flows[0].func(me.remoteInput);
+    flows[0].func(input);
   }
 
   me.addPercentageMetricData = function(accountId, region, percentage, average, estimatedChargesMetric, callback) {
 
-    me.accountId = accountId;
-    me.localInput.region = region;
-    //me.localInput.metrics = null;
-    me.callback = callback;
+    function succeeded(input) { console.log(input); callback(null, true); }
+    function failed(input) { callback(null, false); }
+    function errored(err) { callback(err, null); };
 
-    var metricData = me.SGASIncreasedMetricData;
+    //me.accountId = accountId;
+    //me.localInput.region = region;
+    //me.localInput.metrics = null;
+    //me.callback = callback;
+    var input = {
+      region: region
+    };
+
+    var metricData = JSON.parse(JSON.stringify(me.SGASIncreasedMetricData));
     metricData.MetricData[0].Timestamp = estimatedChargesMetric.TimeStamp
     metricData.MetricData[0].Value = percentage;
-    metricData.MetricData[0].Dimensions[0].Value = me.accountId;
+    metricData.MetricData[0].Dimensions[0].Value = accountId;
     metricData.MetricData[1].Timestamp = estimatedChargesMetric.TimeStamp;
     metricData.MetricData[1].Value = average;
-    metricData.MetricData[1].Dimensions[0].Value = me.accountId;
+    metricData.MetricData[1].Dimensions[0].Value = accountId;
     metricData.MetricData[2].Timestamp = estimatedChargesMetric.TimeStamp;
     metricData.MetricData[2].Value = estimatedChargesMetric.Maximum;
-    metricData.MetricData[2].Dimensions[0].Value = me.accountId;
-    me.localInput.metricData = metricData;
+    metricData.MetricData[2].Dimensions[0].Value = accountId;
+    input.metricData = metricData;
 
     var flows = [
       {func:aws_watch_local.addMetricData, success:succeeded, failure:failed, error:errored},
     ]
     aws_watch_local.flows = flows;
 
-    flows[0].func(me.localInput);
+    flows[0].func(input);
   }
 
   me.addMetricData = function(accountId, creds, localRegion, remoteRegion, current, callback) {
