@@ -362,6 +362,7 @@ Resources:
                 Effect: "Allow"
                 Action:
                   - "cloudwatch:*"
+                  - "kms:*"
                 Resource: "*"
               -
                 Effect: "Allow"
