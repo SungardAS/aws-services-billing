@@ -67,10 +67,10 @@ exports.handler = function (event, context) {
   var cloudwatch = new AWS.CloudWatch({region: region});
   var dynamodb = new AWS.DynamoDB({region: region});
 
-  var allowedPercentage = process.env.ALLOWED_PERCENTAGE;
+  //var allowedPercentage = process.env.ALLOWED_PERCENTAGE;
   var tableName = process.env.DYNAMODB_ALERT_TABLE_NAME;
 
-  //var startTime = new Date(current.getFullYear(), current.getMonth(), current.getDate());
+  /*//var startTime = new Date(current.getFullYear(), current.getMonth(), current.getDate());
   //startTime.setHours(startTime.getHours() - 12);
   //metricsLib.AWSEstimatedChargesMetricQuery.StartTime = startTime;
   //metricsLib.AWSEstimatedChargesMetricQuery.EndTime = current;
@@ -79,10 +79,19 @@ exports.handler = function (event, context) {
   startTime.setHours(startTime.getHours() - 12);
   metricsLib.AWSEstimatedChargesMetricQuery.StartTime = startTime;
   metricsLib.AWSEstimatedChargesMetricQuery.EndTime = endTime;
-  metricsLib.AWSEstimatedChargesMetricQuery.Dimensions[0].Value = awsid;
+  metricsLib.AWSEstimatedChargesMetricQuery.Dimensions[0].Value = awsid;*/
 
   var monthData = {account: null, service: null};
-  var input = {
+
+  metricsLib.findLatestEstimatedChargesMetric(awsid, region, new Date(), function(err, metric) {
+    if(err) {
+      console.log("failed to findLatestEstimatedChargesMetric in account[" + awsid + "] : " + err);
+      return context.fail(err, null);
+    }
+    console.log('completed to findLatestEstimatedChargesMetric in account[' + awsid + ']');
+    console.log(metric);
+
+  /*var input = {
     region: region,
     metricQuery: metricsLib.AWSEstimatedChargesMetricQuery
   }
@@ -92,19 +101,21 @@ exports.handler = function (event, context) {
     var metric = data.Datapoints.sort(function(a, b){return b.Timestamp - a.Timestamp}).splice(0,1)[0];
     console.log(metric);
     return metric;
-  }).then(function(metric) {
+  }).then(function(metric) {*/
     var params = {
-      "accountId": "445750067739",
+      "accountId": awsid,
       "metricData": metric
     }
-    return billing_data.buildAccountData(params).then(function(data) {
+    billing_data.buildAccountData(params).then(function(data) {
       console.log("successfully completed to get account month data");
       //console.log(JSON.stringify(data, null, 2));
       // replace the current month data with the Estimated Charges Metric Data
       data[0].sum[0].enddate = metric.Timestamp;
       data[0].sum[0].blended = metric.Maximum;
       data[0].sum[0].unblended = metric.Maximum;
-      // check the given EstimatedCharges with the average of previous months' charges
+      monthData.account = data;
+      return params;
+      /*// check the given EstimatedCharges with the average of previous months' charges
       // if the given Estimated Charges is below than (average+average*0.02), set the notification ON
       var average = findAccountAverage(data);
       if (metric.Maximum > (average + (average*allowedPercentage))) {
@@ -114,68 +125,71 @@ exports.handler = function (event, context) {
       else {
         console.log(`EstimatedCharges "${metric.Maximum}" is close to the average "${average}", so no notification necessary`);
         return null;
-      }
-    }).catch(function(err) {
-      console.log("err:" + err);
-    });
-  }).then(function(params) {
-    if (params == null) return context.done(null, true);
-    return billing_data.buildServiceData(params).then(function(data) {
-      console.log("successfully completed to get service month data");
-      //console.log(JSON.stringify(data, null, 2));
-      monthData.service = data;
-      monthData.region = region;
-      //console.log(JSON.stringify(monthData, null, 2));
-      graph_data.draw(monthData, function(err, data) {
-        if (err) {
-          console.log(err);
-          context.fail(err, null);
-        }
-        else {
-          console.log(data);
-          var asOfDateTime = new Date(monthData.account[0].last_end_date);
-          var asOfDateStr = dateformat(asOfDateTime, "UTC:dd");
-          var asOfTimeStr = dateformat(asOfDateTime, "UTC:HH:MM:ss");
-          // now, save the notification
-          message += "\n\nPlease review below graphs for more detail.";
-          message += `\n\nAccount Charges As Of Day ${asOfDateStr} At ${asOfTimeStr} UTC In Each Month`;
-          message += `\n${data.sum}`;
-          message += `\n\nCharges By Service In Each Month`;
-          message += `\n${data.service}`;
-          var item = {
-              "id": {"S": messageId},
-              "awsid": {"S": awsid},
-              "subject": {"S": subject},
-              "message": {"S": message},
-              "sentBy": {"S": sentBy},
-              "sentAt": {"S": sentAt},
-              //"createdAt": {"S": current.toISOString()},
-              //"updatedAt": {"S": current.toISOString()},
-              //"account": {"N": '0'},
-              //"archivedBy": {"S": "none"}
+      }*/
+    }).then(function(params) {
+      //if (params == null) return context.done(null, true);
+      return billing_data.buildServiceData(params).then(function(data) {
+        console.log("successfully completed to get service month data");
+        //console.log(JSON.stringify(data, null, 2));
+        monthData.service = data;
+        monthData.region = region;
+        //console.log(JSON.stringify(monthData, null, 2));
+        // set titles
+        var asOfDateTime = new Date(monthData.account[0].last_end_date);
+        var asOfDateStr = dateformat(asOfDateTime, "UTC:dd");
+        var asOfTimeStr = dateformat(asOfDateTime, "UTC:HH:MM:ss");
+        monthData.titles = {
+          account: `<b>Account Charges As Of Day ${asOfDateStr} At ${asOfTimeStr} UTC In Each Month</b><br><i>Account : ${awsid}</i>`,
+          service: `<b>Charges By Service In Each Month</b><br><i>Account : ${awsid}</i>`
+        };
+        graph_data.draw(monthData, function(err, data) {
+          if (err) {
+            console.log(err);
+            context.fail(err, null);
           }
-          console.log(item);
-          var params = {
-            "TableName": tableName,
-            "Item" : item
-          };
-          dynamodb.putItem(params, function(err, data) {
-            if (err) {
-              console.log(err);
-              context.fail(err, null);
+          else {
+            console.log(data);
+            // now, save the notification
+            message += "\n\nPlease review below graphs for more detail.";
+            //message += `\n\nAccount Charges As Of Day ${asOfDateStr} At ${asOfTimeStr} UTC In Each Month`;
+            message += `\n${data.sum}`;
+            //message += `\n\nCharges By Service In Each Month`;
+            message += `\n${data.service}`;
+            var item = {
+                "id": {"S": messageId},
+                "awsid": {"S": awsid},
+                "subject": {"S": subject},
+                "message": {"S": message},
+                "sentBy": {"S": sentBy},
+                "sentAt": {"S": sentAt},
+                //"createdAt": {"S": current.toISOString()},
+                //"updatedAt": {"S": current.toISOString()},
+                //"account": {"N": '0'},
+                //"archivedBy": {"S": "none"}
             }
-            else {
-              context.done(null, true);
-            }
-          });
-        }
-      })
+            console.log(item);
+            var params = {
+              "TableName": tableName,
+              "Item" : item
+            };
+            dynamodb.putItem(params, function(err, data) {
+              if (err) {
+                console.log(err);
+                context.fail(err, null);
+              }
+              else {
+                context.done(null, true);
+              }
+            });
+          }
+        })
+      }).catch(function(err) {
+        console.log("err:" + err);
+      });
     }).catch(function(err) {
-      console.log("err:" + err);
+      console.log(err);
+      context.fail(err);
     });
-  }).catch(function(err) {
-    console.log(err);
-    context.fail(err);
   });
 }
 

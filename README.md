@@ -43,7 +43,7 @@ Input Parameter Values
 
 - GitHubSourceRepositoryOwner: `SungardAS`
 
-- ParameterOverrides: `{ "VPCCidrBlock": "ip_range", "SubnetCidrBlock1": "ip_range", "SubnetCidrBlock2": "ip_range", "NameTag": "redshift", "RedshiftUser": "redshift_user", "RedshiftPass": "redshift_pass", "RedshiftDatabase": "redshift_db", "RedshiftSnapshotIdentifier": "snapshot_id_to_restore_from", "RedshiftSnapshotClusterIdentifier": "cluster_of_source_snapshot", "AlarmThresholdNumber": 10, "AllowedUsagePercentage": "0.2", PlotlyUsername": "plotly_user_name", "PlotlyAPIKey": "plotly_api_key" }`
+- ParameterOverrides: `{ "VPCCidrBlock": "ip_range", "SubnetCidrBlock1": "ip_range", "SubnetCidrBlock2": "ip_range", "NameTag": "redshift", "RedshiftUser": "redshift_user", "RedshiftPass": "redshift_pass", "RedshiftDatabase": "redshift_db", "RedshiftSnapshotIdentifier": "snapshot_id_to_restore_from", "RedshiftSnapshotClusterIdentifier": "cluster_of_source_snapshot", "AlarmThresholdNumber": 10, "PlotlyUsername": "plotly_user_name", "PlotlyAPIKey": "plotly_api_key" }`
 
 - ProjectImage: `aws/codebuild/nodejs:4.3.2`
 

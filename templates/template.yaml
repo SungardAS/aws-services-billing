@@ -71,10 +71,6 @@ Parameters:
     Type: Number
     Default: 10
     Description: Threshold Number for Alarms
-  AllowedUsagePercentage:
-    Type: Number
-    Default: 0.02
-    Description: Allowed Usage Percentage from Average of Previous Month Usages
   PlotlyUsername:
     Type: String
     Description: Plotly Username
@@ -489,7 +485,6 @@ Resources:
           REDSHIFT_CONNECTION_STRING: !Sub "${RedshiftCluster.Outputs.RedshiftConnectionString}"
           REDSHIFT_USER: !Ref RedshiftUser
           REDSHIFT_PASS: !Ref RedshiftPass
-          ALLOWED_PERCENTAGE: !Ref AllowedUsagePercentage
           S3_BUCKET_NAME: !Ref GraphImageBucket
           PLOTLY_USERNAME: !Ref PlotlyUsername
           PLOTLY_API_KEY: !Ref PlotlyAPIKey

@@ -1,6 +1,7 @@
 
 var alarms = require('./alarms');
 var metrics = new (require('./metrics'))();
+var billing_data = require('./billing_data');
 
 exports.handler = function (event, context) {
 
@@ -45,19 +46,50 @@ exports.handler = function (event, context) {
     threshold: threshold,
     ALARM_NAME_PREFIX: 'OverIncreasedPercentagesAlarm-'
   };
-  metrics.addMetricData(accountId, null, region, region, new Date(), function(err, data) {
-    if(err) {
-      console.log("failed to add metrics in account[" + accountId + "] : " + err);
-      context.fail(err, null);
-    }
-    else {
-      console.log('completed to add metrics in account[' + accountId + ']');
-      console.log(data);
-      alarms.setupOne(alarmParams).then(function(data) {
-        context.done(null, data);
+  alarms.setupOne(alarmParams).then(function(data) {
+    var curEstimatedChargesMetric = null;
+    metrics.findLatestEstimatedChargesMetric(accountId, region, new Date(), function(err, metric) {
+      if(err) {
+        console.log("failed to findLatestEstimatedChargesMetric in account[" + accountId + "] : " + err);
+        return context.fail(err, null);
+      }
+      console.log('completed to findLatestEstimatedChargesMetric in account[' + accountId + ']');
+      //console.log(metric);
+      curEstimatedChargesMetric = metric;
+      var params = {
+        "accountId": accountId,
+        "metricData": curEstimatedChargesMetric
+      }
+      billing_data.buildAccountData(params).then(function(data) {
+        console.log("successfully completed to get account history data");
+        //console.log(JSON.stringify(data, null, 2));
+        // check the given EstimatedCharges with the average of previous months' charges
+        // if the given Estimated Charges is below than (average+average*0.02), set the notification ON
+        var average = findAccountAverage(data);
+        var percentage = ((average - curEstimatedChargesMetric.Maximum) / curEstimatedChargesMetric.Maximum) * 100;
+        metrics.addPercentageMetricData(accountId, region, percentage, curEstimatedChargesMetric.Maximum, curEstimatedChargesMetric.TimeStamp, function(err, metric) {
+          if(err) {
+            console.log("failed to addPercentageMetricData in account[" + accountId + "] : " + err);
+            return context.fail(err, null);
+          }
+          context.done(null, metric);
+        });
       }).catch(function(err) {
-        context.fail(err);
+        console.log("failed to addPercentageMetricData in account[" + accountId + "] : " + err);
+        return context.fail(err, null);
       });
-    }
+    });
+  }).catch(function(err) {
+    console.log("failed to alarms.setupOne in account[" + accountId + "] : " + err);
+    return context.fail(err, null);
   });
+}
+
+function findAccountAverage(monthData) {
+  // find the average of previous months' charges first
+  var total = 0;
+  monthData.forEach(function(data) {
+    total += parseFloat(data.sum[0].unblended);
+  });
+  return total/monthData.length;
 }

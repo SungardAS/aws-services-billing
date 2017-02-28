@@ -180,6 +180,52 @@ function Metrics() {
   function failed(input) { me.callback(null, false); }
   function errored(err) { me.callback(err, null); };
 
+  me.findLatestEstimatedChargesMetric = function(accountId, region, current, callback) {
+
+    function succeeded(input) {
+      input.metrics.sort(function(a, b){return b.Timestamp - a.Timestamp});
+      callback(null, input.metrics.splice(0,1)[0]);
+    }
+
+    me.accountId = accountId;
+    me.remoteInput.region = region;
+    me.remoteInput.metrics = null;
+    me.callback = callback;
+    if (current)  me.current = current;
+
+    var flows = [
+      {func:buildEstimatedChargesMetricsData, success:aws_watch_remote.findMetricsStatistics, failure:failed, error:errored},
+      {func:aws_watch_remote.findMetricsStatistics, success:succeeded, failure:failed, error:errored}
+    ]
+    aws_watch_remote.flows = flows;
+
+    flows[0].func(me.remoteInput);
+  }
+
+  me.addPercentageMetricData = function(accountId, region, percentage, curEstimatedCharge, timeStamp, callback) {
+
+    me.accountId = accountId;
+    me.localInput.region = region;
+    //me.localInput.metrics = null;
+    me.callback = callback;
+
+    var metricData = me.SGASIncreasedMetricData;
+    metricData.MetricData[0].Timestamp = timeStamp;
+    metricData.MetricData[0].Value = percentage;
+    metricData.MetricData[0].Dimensions[0].Value = me.accountId;
+    metricData.MetricData[1].Timestamp = timeStamp;
+    metricData.MetricData[1].Value = curEstimatedCharge;
+    metricData.MetricData[1].Dimensions[0].Value = me.accountId;
+    me.localInput.metricData = metricData;
+
+    var flows = [
+      {func:aws_watch_local.addMetricData, success:succeeded, failure:failed, error:errored},
+    ]
+    aws_watch_local.flows = flows;
+
+    flows[0].func(me.localInput);
+  }
+
   me.addMetricData = function(accountId, creds, localRegion, remoteRegion, current, callback) {
 
     me.accountId = accountId;

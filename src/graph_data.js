@@ -19,12 +19,12 @@ module.exports = {
       var sumByServiceData = buildServiceData(params.service);
       var sumGraphUrl = null;
       var sumByServiceGraphUrl = null;
-      buildGraph(sumData, function(err, data) {
+      buildGraph(sumData, params.titles.account, function(err, data) {
         if(err) return callback(err, null);
         else {
           sumGraphUrl = data;
           console.log(`sum graph url : ${sumGraphUrl}`);
-          buildGraph(sumByServiceData, function(err, data) {
+          buildGraph(sumByServiceData, params.titles.service, function(err, data) {
             if(err) return callback(err, null);
             else {
               sumByServiceGraphUrl = data;
@@ -48,10 +48,20 @@ module.exports = {
   }
 }
 
-function buildGraph(data, callback) {
+function buildGraph(data, title, callback) {
   var plotly = require('plotly')(username, apiKey);
-  var figure = { 'data': data };
-  //console.log(figure);
+  var figure = {
+    "data": data,
+    "layout": {
+      "titlefont": {
+        "color": "",
+        "family": "",
+        "size": 0
+      },
+      "title": title
+    }
+  };
+  console.log(figure);
   var imgOpts = {
       format: 'png',
       width: 1000,
