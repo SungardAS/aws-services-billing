@@ -68,7 +68,7 @@ exports.handler = function (event, context) {
         var average = findAccountAverage(data);
         var percentage = ((curEstimatedChargesMetric.Maximum - average) / average) * 100;
         //metrics.addPercentageMetricData(accountId, region, percentage, curEstimatedChargesMetric.Maximum, curEstimatedChargesMetric.TimeStamp, function(err, metric) {
-        metrics.addPercentageMetricData(accountId, region, percentage, average, curEstimatedChargesMetric.TimeStamp, function(err, metric) {
+        metrics.addPercentageMetricData(accountId, region, percentage, average, curEstimatedChargesMetric, function(err, metric) {
           if(err) {
             console.log("failed to addPercentageMetricData in account[" + accountId + "] : " + err);
             return context.fail(err, null);

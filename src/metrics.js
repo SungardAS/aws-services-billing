@@ -54,8 +54,8 @@ function Metrics() {
         Unit: 'Percent',
         Value: null
       },
-      /*{
-        MetricName: 'EstimatedCharges',
+      {
+        MetricName: 'AverageCharges',
         Dimensions: [
           {
             Name: 'LinkedAccount',
@@ -65,9 +65,9 @@ function Metrics() {
         Timestamp: null,
         Unit: 'None',
         Value: null
-      },*/
+      },
       {
-        MetricName: 'AverageCharges',
+        MetricName: 'EstimatedCharges',
         Dimensions: [
           {
             Name: 'LinkedAccount',
@@ -214,8 +214,7 @@ function Metrics() {
     flows[0].func(me.remoteInput);
   }
 
-  //me.addPercentageMetricData = function(accountId, region, percentage, curEstimatedCharge, timeStamp, callback) {
-  me.addPercentageMetricData = function(accountId, region, percentage, average, timeStamp, callback) {
+  me.addPercentageMetricData = function(accountId, region, percentage, average, estimatedChargesMetric, callback) {
 
     me.accountId = accountId;
     me.localInput.region = region;
@@ -223,12 +222,15 @@ function Metrics() {
     me.callback = callback;
 
     var metricData = me.SGASIncreasedMetricData;
-    metricData.MetricData[0].Timestamp = timeStamp;
+    metricData.MetricData[0].Timestamp = estimatedChargesMetric.TimeStamp
     metricData.MetricData[0].Value = percentage;
     metricData.MetricData[0].Dimensions[0].Value = me.accountId;
-    metricData.MetricData[1].Timestamp = timeStamp;
+    metricData.MetricData[1].Timestamp = estimatedChargesMetric.TimeStamp;
     metricData.MetricData[1].Value = average;
     metricData.MetricData[1].Dimensions[0].Value = me.accountId;
+    metricData.MetricData[2].Timestamp = estimatedChargesMetric.TimeStamp;
+    metricData.MetricData[2].Value = estimatedChargesMetric.Maximum;
+    metricData.MetricData[2].Dimensions[0].Value = me.accountId;
     me.localInput.metricData = metricData;
 
     var flows = [
