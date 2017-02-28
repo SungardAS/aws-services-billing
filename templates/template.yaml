@@ -362,6 +362,7 @@ Resources:
                 Effect: "Allow"
                 Action:
                   - "cloudwatch:*"
+                  - "ec2:*"
                   - "kms:*"
                 Resource: "*"
               -
@@ -456,12 +457,12 @@ Resources:
                   - "cloudwatch:*"
                   - "ec2:*"
                   - "s3:*"
+                  - "kms:*"
                 Resource: "*"
               -
                 Effect: "Allow"
                 Action:
                   - "sns:Publish"
-                  - "kms:*"
                 Resource: "arn:aws:sns:*"
               -
                 Effect: "Allow"
