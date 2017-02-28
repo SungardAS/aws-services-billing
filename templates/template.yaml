@@ -407,6 +407,12 @@ Resources:
       CodeUri: ../src
       Role: !GetAtt MetricsLambdaFunctionIAMRole.Arn
       Timeout: 300
+      VpcConfig:
+        SecurityGroupIds:
+          - !Sub "${SecurityGroups.Outputs.RedshiftSecurityGroupId}"
+        SubnetIds:
+          - !Sub "${PrivateSubnet1.Outputs.SubnetId}"
+          - !Sub "${PrivateSubnet2.Outputs.SubnetId}"
       Environment:
         Variables:
           REDSHIFT_CONNECTION_STRING: !Sub "${RedshiftCluster.Outputs.RedshiftConnectionString}"

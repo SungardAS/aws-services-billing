@@ -10,6 +10,7 @@ var kmsRegion = process.env.KMS_REGION;
 var redshiftConnectionString = process.env.REDSHIFT_CONNECTION_STRING;
 var redshiftUser = process.env.REDSHIFT_USER;
 var redshiftPass = process.env.REDSHIFT_PASS;
+var PREVIOUS_MONTH_COUNT = 5;
 
 var startYearMonthStr = "201608";
 
@@ -49,7 +50,7 @@ module.exports = {
       var promises = [];
       var prevMonthcount = 0;
       var monthData = findMonthDate(lastEndDate, prevMonthcount);
-      while(monthData.year_month >= startYearMonthStr) {
+      while(monthData.year_month >= startYearMonthStr && prevMonthcount < PREVIOUS_MONTH_COUNT) {
         promises.push(findMonthSum(monthData));
         monthData = findMonthDate(lastEndDate, ++prevMonthcount);
       }
@@ -76,7 +77,7 @@ module.exports = {
       var promises = [];
       var prevMonthcount = 0;
       var monthData = findMonthDate(lastEndDate, prevMonthcount);
-      while(monthData.year_month >= startYearMonthStr) {
+      while(monthData.year_month >= startYearMonthStr && prevMonthcount < PREVIOUS_MONTH_COUNT) {
         promises.push(findMonthSumByService(monthData));
         monthData = findMonthDate(lastEndDate, ++prevMonthcount);
       }
