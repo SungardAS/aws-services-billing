@@ -524,7 +524,7 @@ Resources:
   SlackFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: SungardAS-Billing-Alert
+      FunctionName: SungardAS-Billing-Alert-Slack
       Handler: index_alert_slack.handler
       Runtime: nodejs4.3
       CodeUri: ../src
