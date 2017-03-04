@@ -69,17 +69,13 @@ exports.handler = function (event, context) {
     context.done(null, true);
   }
 
+  var threshold = process.env.THRESHOLD_FOR_ALARMS;
   var allowedAverageCost = process.env.ALLOWED_AVERAGE_COST;
-  var tableName = process.env.DYNAMODB_ALERT_TABLE_NAME;
 
   var current = new Date();
-  metricsLib.findLatestSGASBillingMetrics(awsid, region, current).then(function(metrics) {
+  metricsLib.findLatestSGASBillingMetrics(awsid, region, current, allowedAverageCost).then(function(metrics) {
     console.log(metrics);
-    var average = metrics.average.Maximum;
-    var estimated = metrics.estimated.Maximum;
-    var cost = ((estimated - average) / average) * 100;
-    if (cost <= allowedAverageCost) {
-      console.log(`estimated [${estimated}] - average [${average}] cost [${cost}] is not greater than the allowed [${allowedAverageCost}], so no alert necessary`);
+    if (metrics == null) {
       return context.done(null, true);
     }
     generator.generate(awsid, metrics, region, function(err, data) {
@@ -87,7 +83,9 @@ exports.handler = function (event, context) {
         console.log("failed to generate alert message");
         return context.fail(err);
       }
-      message = buildMessage(awsid, data);
+      message = `EstimatedCharges Increase Percentage (${metrics.percentage.Maximum}) is greater than Threshold (${threshold}).`;
+      message += `\nAnd Percentage By Average (${metrics.cost}) is greater than Threshold (${allowedAverageCost}).`;
+      message = buildMessage(awsid, data, message);
       if (hookUrl) {
         // Container reuse, simply process the event with the key in memory
         processEvent(message, context);
@@ -161,13 +159,13 @@ function processEvent(slackMessage, callback) {
   });
 }
 
-function buildMessage(accountId, data) {
+function buildMessage(accountId, data, message) {
   var message = {
     icon_emoji: ":postbox:",
     "text": "New Billing Alert!",
     "attachments": [
         {
-            "text": "Peak In Estimated Charges Has Been Detected.",
+            "text": message,
             "color": "warning",
             "fields": [
               {

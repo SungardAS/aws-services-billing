@@ -509,6 +509,7 @@ Resources:
           REDSHIFT_CONNECTION_STRING: !Sub "${RedshiftCluster.Outputs.RedshiftConnectionString}"
           REDSHIFT_USER: !Ref RedshiftUser
           REDSHIFT_PASS: !Ref RedshiftPass
+          THRESHOLD_FOR_ALARMS: !Ref AlarmThresholdNumber
           ALLOWED_AVERAGE_COST: !Ref AllowedAverageCost
           S3_BUCKET_NAME: !Ref GraphImageBucket
           PLOTLY_USERNAME: !Ref PlotlyUsername
@@ -541,11 +542,11 @@ Resources:
           REDSHIFT_CONNECTION_STRING: !Sub "${RedshiftCluster.Outputs.RedshiftConnectionString}"
           REDSHIFT_USER: !Ref RedshiftUser
           REDSHIFT_PASS: !Ref RedshiftPass
+          THRESHOLD_FOR_ALARMS: !Ref AlarmThresholdNumber
           ALLOWED_AVERAGE_COST: !Ref AllowedAverageCost
           S3_BUCKET_NAME: !Ref GraphImageBucket
           PLOTLY_USERNAME: !Ref PlotlyUsername
           PLOTLY_API_KEY: !Ref PlotlyAPIKey
-          DYNAMODB_ALERT_TABLE_NAME: !Ref Table
           KMS_REGION: !Ref 'AWS::Region'
           KMS_KEY_ID: !Ref EncryptionDecryptionKey
           HOOK_URL: !Ref SlackWebHookUrl

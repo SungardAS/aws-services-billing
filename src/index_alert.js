@@ -63,17 +63,19 @@ exports.handler = function (event, context) {
 
   var dynamodb = new AWS.DynamoDB({region: region});
 
+  var threshold = process.env.THRESHOLD_FOR_ALARMS;
   var allowedAverageCost = process.env.ALLOWED_AVERAGE_COST;
   var tableName = process.env.DYNAMODB_ALERT_TABLE_NAME;
 
   var current = new Date();
-  metricsLib.findLatestSGASBillingMetrics(awsid, region, current).then(function(metrics) {
+  metricsLib.findLatestSGASBillingMetrics(awsid, region, current, allowedAverageCost).then(function(metrics) {
     console.log(metrics);
-    var average = metrics.average.Maximum;
+    /*var average = metrics.average.Maximum;
     var estimated = metrics.estimated.Maximum;
     var cost = ((estimated - average) / average) * 100;
     if (cost <= allowedAverageCost) {
-      console.log(`estimated [${estimated}] - average [${average}] cost [${cost}] is not greater than the allowed [${allowedAverageCost}], so no alert necessary`);
+      console.log(`estimated [${estimated}] - average [${average}] cost [${cost}] is not greater than the allowed [${allowedAverageCost}], so no alert necessary`);*/
+    if (metrics == null) {
       return context.done(null, true);
     }
 
@@ -82,6 +84,8 @@ exports.handler = function (event, context) {
         console.log("failed to generate alert message");
         return context.fail(err);
       }
+      message = `EstimatedCharges Increase Percentage (${metrics.percentage}) is greater than Threshold (${threshold}).`;
+      message += `\nAnd Percentage By Average (${metrics.cost}) is greater than Threshold (${allowedAverageCost}).`;
       message += "\n\nPlease review below graphs for more detail.";
       message += `\n${data.sum}`;
       message += `\n${data.service}`;

@@ -237,13 +237,14 @@ function Metrics() {
     return cloudwatch.putMetricData(metricData).promise();
   }
 
-  me.findLatestSGASBillingMetrics = function(accountId, region, current) {
+  me.findLatestSGASBillingMetrics = function(accountId, region, current, allowedAverageCost) {
     var params = {
       region: region
     };
     var cloudwatch = new AWS.CloudWatch(params);
-    var startTime = new Date(current.getFullYear(), current.getMonth(), current.getDate());
-    startTime.setHours(startTime.getHours() - 24*14);
+    //var startTime = new Date(current.getFullYear(), current.getMonth(), current.getDate());
+    //startTime.setHours(startTime.getHours() - 24*14);
+    var startTime = new Date(current.getFullYear(), current.getMonth(), 1)
     var metricQuery = JSON.parse(JSON.stringify(me.SGASBillingMetricQuery));
     metricQuery.StartTime = startTime;
     metricQuery.EndTime = current;
@@ -254,14 +255,16 @@ function Metrics() {
     return cloudwatch.getMetricStatistics(metricQuery).promise().then(function(data) {
       data.Datapoints.sort(function(a, b){return b.Timestamp - a.Timestamp});
       var latestMetrics = {};
-      latestMetrics.percentage = data.Datapoints[0];
+      //latestMetrics.percentage = data.Datapoints[0];
+      latestMetrics.percentage = data.Datapoints;
       return latestMetrics;
     }).then(function(latestMetrics) {
       metricQuery.MetricName = "AverageCharges";
       metricQuery.Unit = "None";
       return cloudwatch.getMetricStatistics(metricQuery).promise().then(function(data) {
         data.Datapoints.sort(function(a, b){return b.Timestamp - a.Timestamp});
-        latestMetrics.average = data.Datapoints[0];
+        //latestMetrics.average = data.Datapoints[0];
+        latestMetrics.average = data.Datapoints;
         return latestMetrics;
       });
     }).then(function(latestMetrics) {
@@ -269,11 +272,46 @@ function Metrics() {
       metricQuery.Unit = "None";
       return cloudwatch.getMetricStatistics(metricQuery).promise().then(function(data) {
         data.Datapoints.sort(function(a, b){return b.Timestamp - a.Timestamp});
-        latestMetrics.estimated = data.Datapoints[0];
+        //latestMetrics.estimated = data.Datapoints[0];
+        latestMetrics.estimated = data.Datapoints;
         return latestMetrics;
       });
+    }).then(function(latestMetrics) {
+      return validateAlert(latestMetrics, allowedAverageCost);
     })
   }
+}
+
+function validateAlert(latestMetrics, allowedAverageCost) {
+
+  var average = latestMetrics.average[0].Maximum;
+  var estimated = latestMetrics.estimated[0].Maximum;
+  var cost = ((estimated - average) / average) * 100;
+  if (cost <= allowedAverageCost) {
+    console.log(`estimated [${estimated}] - average [${average}] cost [${cost}] is not greater than the allowed [${allowedAverageCost}], so no alert necessary`);
+    return null;
+  }
+
+  var firstCost = cost;
+  var maxCost = cost;
+  latestMetrics.estimated.forEach(function(metrics, idx) {
+    var nexAverage = latestMetrics.average[idx].Maximum;
+    var nextEstimated = latestMetrics.estimated[idx].Maximum;
+    cost = ((nextEstimated - nexAverage) / nexAverage) * 100;
+    if (cost > maxCost) maxCost = cost;
+  });
+
+  // return true if the current cost is the biggest
+  if (firstCost <= maxCost) {
+    console.log(`estimated [${estimated}] - average [${average}] cost [${firstCost}] is greater than the allowed [${allowedAverageCost}] but less than previous max cost [${maxCost}], so no alert necessary`);
+    return null;
+  }
+
+  latestMetrics.percentage = latestMetrics.percentage[0];
+  latestMetrics.average = latestMetrics.average[0];
+  latestMetrics.estimated = latestMetrics.estimated[0];
+  latestMetrics.cost = firstCost;
+  return latestMetrics;
 }
 
 module.exports = Metrics
