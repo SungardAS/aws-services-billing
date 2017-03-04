@@ -167,7 +167,7 @@ function buildMessage(accountId, data) {
     "text": "New Billing Alert!",
     "attachments": [
         {
-            "text": "Estimated Charged Increase Has Been Detected",
+            "text": "Peak In Estimated Charges Has Been Detected.",
             "color": "warning",
             "fields": [
               {
@@ -177,7 +177,7 @@ function buildMessage(accountId, data) {
               }
             ],
             "author_name": "Sungard Availability Services",
-            "footer": "Created By Sungard Availability Services",
+            "footer": "Created By SungardAS/aws-services",
             "footer_icon": "https://raw.githubusercontent.com/SungardAS/aws-services-lib/master/docs/images/logo.png",
             //"ts": new Date()
 
