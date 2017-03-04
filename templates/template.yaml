@@ -71,6 +71,10 @@ Parameters:
     Type: Number
     Default: 10
     Description: Threshold Number for Alarms
+  AllowedAverageCost:
+    Type: Number
+    Default: 2
+    Description: Allowed Average Cost
   PlotlyUsername:
     Type: String
     Description: Plotly Username
@@ -78,6 +82,13 @@ Parameters:
     Type: String
     NoEcho: true
     Description: Plotly API Key
+  SlackWebHookUrl:
+    Type: String
+    NoEcho: true
+    Description: Slack Webhook Url
+  SlackChannel:
+    Type: String
+    Description: Slack Channel Name
 Resources:
   Vpc:
     Type: "AWS::CloudFormation::Stack"
@@ -498,12 +509,47 @@ Resources:
           REDSHIFT_CONNECTION_STRING: !Sub "${RedshiftCluster.Outputs.RedshiftConnectionString}"
           REDSHIFT_USER: !Ref RedshiftUser
           REDSHIFT_PASS: !Ref RedshiftPass
+          ALLOWED_AVERAGE_COST: !Ref AllowedAverageCost
           S3_BUCKET_NAME: !Ref GraphImageBucket
           PLOTLY_USERNAME: !Ref PlotlyUsername
           PLOTLY_API_KEY: !Ref PlotlyAPIKey
           DYNAMODB_ALERT_TABLE_NAME: !Ref Table
           KMS_REGION: !Ref 'AWS::Region'
           KMS_KEY_ID: !Ref EncryptionDecryptionKey
+      Events:
+        BillingAlertTopic:
+          Type: SNS
+          Properties:
+            Topic: !Ref OverIncreasedPercentTopic
+  SlackFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: SungardAS-Billing-Alert
+      Handler: index_alert_slack.handler
+      Runtime: nodejs4.3
+      CodeUri: ../src
+      Role: !GetAtt AlertLambdaFunctionIAMRole.Arn
+      Timeout: 300
+      VpcConfig:
+        SecurityGroupIds:
+          - !Sub "${SecurityGroups.Outputs.RedshiftSecurityGroupId}"
+        SubnetIds:
+          - !Sub "${PrivateSubnet1.Outputs.SubnetId}"
+          - !Sub "${PrivateSubnet2.Outputs.SubnetId}"
+      Environment:
+        Variables:
+          REDSHIFT_CONNECTION_STRING: !Sub "${RedshiftCluster.Outputs.RedshiftConnectionString}"
+          REDSHIFT_USER: !Ref RedshiftUser
+          REDSHIFT_PASS: !Ref RedshiftPass
+          ALLOWED_AVERAGE_COST: !Ref AllowedAverageCost
+          S3_BUCKET_NAME: !Ref GraphImageBucket
+          PLOTLY_USERNAME: !Ref PlotlyUsername
+          PLOTLY_API_KEY: !Ref PlotlyAPIKey
+          DYNAMODB_ALERT_TABLE_NAME: !Ref Table
+          KMS_REGION: !Ref 'AWS::Region'
+          KMS_KEY_ID: !Ref EncryptionDecryptionKey
+          HOOK_URL: !Ref SlackWebHookUrl
+          SLACK_CHANNEL: !Ref SlackChannel
       Events:
         BillingAlertTopic:
           Type: SNS

@@ -1,7 +1,15 @@
 
 var AWS = require('aws-sdk');
+const url = require('url');
+const https = require('https');
 var metricsLib = new (require('./metrics'))();
 var generator = require('./alert_message_generator.js');
+
+// The base-64 encoded, encrypted key (CiphertextBlob) stored in the HOOK_URL environment variable
+const hookUrl = process.env.HOOK_URL;
+// The Slack channel to send a message to stored in the SLACK_CHANNEL environment variable
+const slackChannel = process.env.SLACK_CHANNEL;
+var hookUrl;
 
 exports.handler = function (event, context) {
 
@@ -61,8 +69,6 @@ exports.handler = function (event, context) {
     context.done(null, true);
   }
 
-  var dynamodb = new AWS.DynamoDB({region: region});
-
   var allowedAverageCost = process.env.ALLOWED_AVERAGE_COST;
   var tableName = process.env.DYNAMODB_ALERT_TABLE_NAME;
 
@@ -76,44 +82,115 @@ exports.handler = function (event, context) {
       console.log(`estimated [${estimated}] - average [${average}] cost [${cost}] is not greater than the allowed [${allowedAverageCost}], so no alert necessary`);
       return context.done(null, true);
     }
-
     generator.generate(awsid, metrics, region, function(err, data) {
       if (err) {
         console.log("failed to generate alert message");
         return context.fail(err);
       }
-      message += "\n\nPlease review below graphs for more detail.";
-      message += `\n${data.sum}`;
-      message += `\n${data.service}`;
-      var item = {
-          "id": {"S": messageId},
-          "awsid": {"S": awsid},
-          "subject": {"S": subject},
-          "message": {"S": message},
-          "sentBy": {"S": sentBy},
-          "sentAt": {"S": sentAt},
-          //"createdAt": {"S": current.toISOString()},
-          //"updatedAt": {"S": current.toISOString()},
-          //"account": {"N": '0'},
-          //"archivedBy": {"S": "none"}
+      message = buildMessage(awsid, data);
+      if (hookUrl) {
+        // Container reuse, simply process the event with the key in memory
+        processEvent(message, context);
       }
-      console.log(item);
-      var params = {
-        "TableName": tableName,
-        "Item" : item
-      };
-      dynamodb.putItem(params, function(err, data) {
-        if (err) {
-          console.log(err);
-          context.fail(err, null);
-        }
-        else {
-          context.done(null, true);
-        }
-      });
+      else if (hookUrl && hookUrl !== '') {
+        const encryptedBuf = new Buffer(hookUrl, 'base64');
+        const cipherText = { CiphertextBlob: encryptedBuf };
+        const kms = new AWS.KMS({region:process.env.KMS_REGION});
+        kms.decrypt(cipherText, (err, data) => {
+          if (err) {
+            console.log('Decrypt error:', err);
+            return context.fail(err);
+          }
+            hookUrl = `https://${data.Plaintext.toString('ascii')}`;
+            processEvent(message, context);
+        });
+      }
+      else {
+        return context.fail('Hook URL has not been set.');
+      }
+      context.done(null, true);
     }).catch(function(err) {
       console.log(err);
       context.fail(err);
     });
   });
+}
+
+function postMessage(message, callback) {
+  const body = JSON.stringify(message);
+  console.log(hookUrl);
+  const options = url.parse(hookUrl);
+  options.method = 'POST';
+  options.headers = {
+    'Content-Type': 'application/json',
+    'Content-Length': Buffer.byteLength(body),
+  };
+  const postReq = https.request(options, (res) => {
+    const chunks = [];
+    res.setEncoding('utf8');
+    res.on('data', (chunk) => chunks.push(chunk));
+    res.on('end', () => {
+      if (callback) {
+        callback({
+          body: chunks.join(''),
+          statusCode: res.statusCode,
+          statusMessage: res.statusMessage,
+        });
+      }
+    });
+    return res;
+  });
+
+  postReq.write(body);
+  postReq.end();
+}
+
+function processEvent(slackMessage, callback) {
+  slackMessage.channel = slackChannel;
+  postMessage(slackMessage, (response) => {
+    if (response.statusCode < 400) {
+      console.info('Message posted successfully');
+      callback.done(null, null);
+    } else if (response.statusCode < 500) {
+      console.error(`Error posting message to Slack API: ${response.statusCode} - ${response.statusMessage}`);
+      callback.done(null, null);  // Don't retry because the error is due to a problem with the request
+    } else {
+      // Let Lambda retry
+      callback.fail(`Server error when processing message: ${response.statusCode} - ${response.statusMessage}`);
+    }
+  });
+}
+
+function buildMessage(accountId, data) {
+  var message = {
+    icon_emoji: ":postbox:",
+    "text": "New Billing Alert!",
+    "attachments": [
+        {
+            "text": "Estimated Charged Increase Has Been Detected",
+            "color": "warning",
+            "fields": [
+              {
+                  "title": "Account Id",
+                  "value": accountId,
+                  "short": true
+              }
+            ],
+            "author_name": "Sungard Availability Services",
+            "footer": "Created By Sungard Availability Services",
+            "footer_icon": "https://raw.githubusercontent.com/SungardAS/aws-services-lib/master/docs/images/logo.png",
+            //"ts": new Date()
+
+        },
+        {
+            "image_url": data.sum,
+            "color": "warning"
+        },
+        {
+            "image_url": data.service,
+            "color": "warning"
+        }
+    ]
+  }
+  return message;
 }

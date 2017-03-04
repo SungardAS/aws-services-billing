@@ -31,12 +31,6 @@ module.exports = {
               console.log(`service graph url : ${sumByServiceGraphUrl}`);
               var graphUrls = {sum: sumGraphUrl, service: sumByServiceGraphUrl};
               //console.log(graphUrls);
-              /*sendSlackMessage(graphUrls, function(err, data) {
-                if(err) return callback(err, null);
-                else {
-                  return callback(null, data);
-                }
-              });*/
               callback(null, graphUrls);
             }
           });
@@ -61,7 +55,7 @@ function buildGraph(data, title, callback) {
       "title": title
     }
   };
-  console.log(figure);
+  console.log(JSON.stringify(figure));
   var imgOpts = {
       format: 'png',
       width: 1000,
@@ -86,15 +80,6 @@ function buildGraph(data, title, callback) {
           throw err;
         }
         else {
-          /*
-            { ETag: '"40ac5bb2fa0644f3c118c99965fcb9d1"',
-              Location: 'https://s3.amazonaws.com/sgas.sam/myKey2.png',
-              key: 'myKey2.png',
-              Key: 'myKey2.png',
-              Bucket: 'sgas.sam' }
-          */
-          //console.log(data);
-          //console.log(data.Location);
           callback(null, data.Location);
         }
       });
@@ -120,9 +105,9 @@ function buildSumData(monthDataArray) {
   };
   for(var i = monthDataArray.length-1; i >= 0; i--) {
     //console.log(monthDataArray[i]);
-    blended.x.push(dateformat(new Date(monthDataArray[i].first_day), 'yyyy-mm'));
+    blended.x.push(dateformat(new Date(monthDataArray[i].last_end_date), 'yyyy-mm-dd'));
     blended.y.push(monthDataArray[i].sum[0].blended);
-    unblended.x.push(dateformat(new Date(monthDataArray[i].first_day), 'yyyy-mm'));
+    unblended.x.push(dateformat(new Date(monthDataArray[i].last_end_date), 'yyyy-mm-dd'));
     unblended.y.push(monthDataArray[i].sum[0].unblended);
   }
   return [blended, unblended];
@@ -133,15 +118,8 @@ function buildServiceData(monthDataArray) {
   var dates = {};
   for(var i = monthDataArray.length-1; i >= 0; i--) {
     //console.log(monthDataArray[i].sum_by_line_item);
-    var date = null;
-    monthDataArray[i].sum_by_line_item.forEach(function(item) {
-      if(date == null) {
-        date = item.enddate;
-      }
-      else if (date < item.enddate) {
-        date = item.enddate;
-      }
-    });
+    var date = monthDataArray[i].last_end_date;
+    console.log(date);
     var line_items = monthDataArray[i].sum_by_line_item;
     dates[date] = [];
     line_items.forEach(function(item) {

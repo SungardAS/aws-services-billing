@@ -2,19 +2,15 @@
 var dateformat = require('dateformat');
 var kms = require('aws-services-lib/aws_promise/kms');
 var pgp = require('pg-promise')();
-//var plotly = require('./index_plotly.js');
-//var slack = require('./index_slack.js');
 
-//var bucketName = process.env.S3_BUCKET_NAME;
 var kmsRegion = process.env.KMS_REGION;
 var redshiftConnectionString = process.env.REDSHIFT_CONNECTION_STRING;
 var redshiftUser = process.env.REDSHIFT_USER;
 var redshiftPass = process.env.REDSHIFT_PASS;
-var PREVIOUS_MONTH_COUNT = 5;
 
+var PREVIOUS_MONTH_COUNT = 5;
 var startYearMonthStr = "201608";
 
-//var accountId = null;
 var connection = null;
 
 module.exports = {
@@ -32,10 +28,11 @@ module.exports = {
       group by lineItem_UsageAccountId \
       order by lineItem_UsageAccountId;"
 
-    var lastEndDate = new Date(params.metricData.Timestamp);
+    //var lastEndDate = new Date(params.metricData.Timestamp);
+    var lastEndDate = new Date(params.timestamp);
     var yearMonth = dateformat(lastEndDate, 'yyyymm');
     querySum = querySum.replace("<account>", params.accountId);
-    return setConnection().then(function(data) {
+    return this.setConnection().then(function(data) {
       //connection = pgp(connectionString);
       var promises = [];
       var prevMonthcount = 0;
@@ -46,7 +43,7 @@ module.exports = {
       }
       return Promise.all(promises).then(function(retArray) {
         pgp.end();
-        //console.log(JSON.stringify(retArray));
+        console.log(JSON.stringify(retArray));
         return retArray;
       }).catch(function(err) {
         pgp.end();
@@ -71,10 +68,11 @@ module.exports = {
       group by lineItem_UsageAccountId, lineitem_productcode \
       order by lineItem_UsageAccountId, lineitem_productcode;"
 
-    var lastEndDate = new Date(params.metricData.Timestamp);
+    //var lastEndDate = new Date(params.metricData.Timestamp);
+    var lastEndDate = new Date(params.timestamp);
     var yearMonth = dateformat(lastEndDate, 'yyyymm');
     queryServiceSum = queryServiceSum.replace("<account>", params.accountId);
-    return setConnection().then(function(data) {
+    return this.setConnection().then(function(data) {
       //connection = pgp(connectionString);
       var promises = [];
       var prevMonthcount = 0;
@@ -95,21 +93,21 @@ module.exports = {
       pgp.end();
       throw err;
     });
-  }
-}
+  },
 
-function setConnection() {
-  if (connection) return Promise.resolve();
-  var input = {
-    region: kmsRegion,
-    password: redshiftPass
-  };
-  return kms.decrypt(input).then(function(data) {
-    var password = data.Plaintext.toString();
-    var connectionString = 'pg:' + redshiftUser + ':' + password + '@' + redshiftConnectionString;
-    connection = pgp(connectionString);
-    return true;
-  });
+  setConnection: function() {
+    if (connection) return Promise.resolve();
+    var input = {
+      region: kmsRegion,
+      password: redshiftPass
+    };
+    return kms.decrypt(input).then(function(data) {
+      var password = data.Plaintext.toString();
+      var connectionString = 'pg:' + redshiftUser + ':' + password + '@' + redshiftConnectionString;
+      connection = pgp(connectionString);
+      return true;
+    });
+  }
 }
 
 function findMonthDate(dateStr, prevMonthcount) {

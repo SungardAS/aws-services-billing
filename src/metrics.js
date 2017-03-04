@@ -1,20 +1,7 @@
 
 var AWS = require('aws-sdk');
-var aws_watch_remote = new (require('aws-services-lib/aws/cloudwatch.js'))();
-var aws_watch_local = new (require('aws-services-lib/aws/cloudwatch.js'))();
 
 function Metrics() {
-
-  this.remoteInput = {
-    region: null
-  };
-
-  this.localInput = {
-    region: null
-  };
-
-  this.callback = null;
-  this.current = new Date();
 
   // metrics for EstimatedCharges
   this.AWSEstimatedChargesMetricQuery = {
@@ -37,6 +24,52 @@ function Metrics() {
       }
    ],
    Unit: 'None'
+  };
+
+  this.AWSEstimatedChargesMetricsListQuery = {
+    Dimensions: [
+      {
+        Name: 'LinkedAccount',
+        Value: null
+      },
+      {
+        Name: 'ServiceName',
+        //Value: 'AWSCloudTrail'
+      },
+      {
+        Name: 'Currency',
+        Value: 'USD'
+      }
+    ],
+    MetricName: 'EstimatedCharges',
+    Namespace: 'AWS/Billing',
+    //NextToken: 'STRING_VALUE'
+  };
+
+  this.AWSEstimatedChargesByServiceMetricQuery = {
+    StartTime: null,
+    EndTime: null,
+    MetricName: 'EstimatedCharges',
+    Namespace: 'AWS/Billing',
+    Period: 60 * 60 * 4,
+    Statistics: [
+     'SampleCount', 'Average', 'Sum', 'Minimum', 'Maximum'
+    ],
+    Dimensions: [
+      {
+        Name: 'LinkedAccount',
+        Value: null
+      },
+      {
+        Name: 'ServiceName',
+        Value: null
+      },
+      {
+        Name: 'Currency',
+        Value: 'USD'
+      }
+    ],
+    Unit: 'None'
   };
 
   // metrics for Increased data metrics
@@ -82,11 +115,10 @@ function Metrics() {
     Namespace: 'SGASBilling'
   };
 
-  // metrics for IncreasedPercentages Query
-  this.IncreasedPercentagesMetricQuery = {
+  this.SGASBillingMetricQuery = {
     StartTime: null,
     EndTime: null,
-    MetricName: 'IncreasedPercentages',
+    MetricName: null,
     Namespace: 'SGASBilling',
     Period: 60 * 60 * 4,
     Statistics: [
@@ -98,192 +130,149 @@ function Metrics() {
         Value: null
       }
    ],
-   Unit: 'Percent'
+   Unit: null
   };
 
   var me = this;
 
-  function buildAWSEstimatedChargesMetricQuery() {
-    var startTime = new Date(me.current.getFullYear(), me.current.getMonth(), me.current.getDate());
-    //me.current.setHours(me.current.getHours() - 1);
-    startTime.setHours(startTime.getHours() - 24*14);
-    me.AWSEstimatedChargesMetricQuery.StartTime = startTime;
-    me.AWSEstimatedChargesMetricQuery.EndTime = me.current;
-    me.AWSEstimatedChargesMetricQuery.Dimensions[0].Value = me.accountId;
-    return me.AWSEstimatedChargesMetricQuery;
-  }
-
-  function buildEstimatedChargesMetricsData() {
-    console.log('<<<Starting buildEstimatedChargesMetricsData...');
-    metricQuery = buildAWSEstimatedChargesMetricQuery();
-    me.remoteInput.metricQuery = metricQuery;
-    //console.log(JSON.stringify(me.remoteInput));
-    console.log('>>>...calling findMetricsStatistics in buildEstimatedChargesMetricsData');
-    aws_watch_remote.findMetricsStatistics(me.remoteInput);
-  }
-
-  function buildIncreasedPercentagesMetricQuery() {
-    console.log('<<<Starting buildIncreasedPercentagesMetricQuery...');
-    var startTime = new Date(me.current.getFullYear(), me.current.getMonth(), me.current.getDate());
-    //me.current.setMinutes(me.current.getMinutes() - 5);
-    startTime.setHours(startTime.getHours() - 24);
-    me.IncreasedPercentagesMetricQuery.StartTime = startTime;
-    me.IncreasedPercentagesMetricQuery.EndTime = me.current;
-    me.IncreasedPercentagesMetricQuery.Dimensions[0].Value = me.accountId;
-    me.localInput.metricQuery = me.IncreasedPercentagesMetricQuery;
-    //console.log(JSON.stringify(me.localInput));
-    console.log('>>>...calling findMetricsStatistics in buildIncreasedPercentagesMetricQuery');
-    aws_watch_local.findMetricsStatistics(me.localInput);
-  }
-
-  function buildIncreasedMetricsData() {
-
-    console.log('<<<Starting buildIncreasedMetricsData...');
-    //console.log(JSON.stringify(me.remoteInput));
-    var metrics = me.remoteInput.metrics.sort(function(a, b){return b.Timestamp - a.Timestamp}).splice(0,2);
-    console.log("***EST CHARGE METRICS : " + JSON.stringify(metrics));
-
-    // check if the new metric data has been generated in remoteRegion
-    var percentageMetrics = me.localInput.metrics;
-    if (me.localInput.metrics && me.localInput.metrics.length >= 2) {
-      percentageMetrics = me.localInput.metrics.sort(function(a, b){return b.Timestamp - a.Timestamp}).splice(0,2);
-    }
-    console.log("***PERCENTAGE METRICS : " + JSON.stringify(percentageMetrics));
-    if (percentageMetrics && percentageMetrics[0] && metrics[0]) {
-      console.log("percentage metrics time : " + percentageMetrics[0].Timestamp);
-      console.log("est charge metrics time : " + metrics[0].Timestamp);
-      if (percentageMetrics[0].Timestamp.getTime() >= metrics[0].Timestamp.getTime()) {
-        console.log("no new EstimatedChargeds metric data, so just return");
-        me.callback(null, true);
-        return;
-      }
-    }
-
-    var curEstimatedCharge = metrics[0].Maximum;
-    var prevEstimatedCharge = 0;
-    var increased = 0;
-    var percentage = 0;
-    var timeStamp = metrics[0].Timestamp;
-    if (metrics.length >= 2) {
-      prevEstimatedCharge = metrics[1].Maximum;
-      increased = curEstimatedCharge - prevEstimatedCharge;
-      if (prevEstimatedCharge > 0) {
-        percentage = (increased / prevEstimatedCharge) * 100;
-      }
-    }
-
-    //currentTime = new Date();
-    metricData = me.SGASIncreasedMetricData;
-    //metricData.MetricData[0].Timestamp = currentTime;
-    metricData.MetricData[0].Timestamp = timeStamp;
-    metricData.MetricData[0].Value = percentage;
-    metricData.MetricData[0].Dimensions[0].Value = me.accountId;
-    metricData.MetricData[1].Timestamp = timeStamp;
-    metricData.MetricData[1].Value = curEstimatedCharge;
-    metricData.MetricData[1].Dimensions[0].Value = me.accountId;
-    me.localInput.metricData = metricData;
-    //console.log(JSON.stringify(me.localInput));
-    console.log(JSON.stringify(metricData));
-    console.log('>>>...completed buildIncreasedMetricsData');
-    aws_watch_local.addMetricData(me.localInput);
-  }
-
-  function succeeded(input) { console.log(input); me.callback(null, true); }
-  function failed(input) { me.callback(null, false); }
-  function errored(err) { me.callback(err, null); };
-
-  me.findLatestEstimatedChargesMetric = function(accountId, region, current, callback) {
-
-    function succeeded(input) {
-      input.metrics.sort(function(a, b){return b.Timestamp - a.Timestamp});
-      callback(null, input.metrics.splice(0,1)[0]);
-    }
-    function failed(input) { callback(null, false); }
-    function errored(err) { callback(err, null); };
-
-    //me.accountId = accountId;
-    //me.remoteInput.region = region;
-    //me.remoteInput.metrics = null;
-    //me.callback = callback;
-    //if (current)  me.current = current;
-    var input = {
+  me.findLatestEstimatedChargesMetrics = function(accountId, region, current, metricsCount) {
+    var params = {
       region: region
     };
-
+    var cloudwatch = new AWS.CloudWatch(params);
+    var metrics = {'estimated': null, 'average': null, 'percentage': null};
     var startTime = new Date(current.getFullYear(), current.getMonth(), current.getDate());
-    //me.current.setHours(me.current.getHours() - 1);
     startTime.setHours(startTime.getHours() - 24*14);
     var metricQuery = JSON.parse(JSON.stringify(me.AWSEstimatedChargesMetricQuery));
     metricQuery.StartTime = startTime;
     metricQuery.EndTime = current;
     metricQuery.Dimensions[0].Value = accountId;
-    input.metricQuery = metricQuery;
-
-    var flows = [
-      {func:aws_watch_remote.findMetricsStatistics, success:succeeded, failure:failed, error:errored}
-    ]
-    aws_watch_remote.flows = flows;
-
-    flows[0].func(input);
+    return cloudwatch.getMetricStatistics(metricQuery).promise().then(function(data) {
+      data.Datapoints.sort(function(a, b){return b.Timestamp - a.Timestamp});
+      return data.Datapoints.splice(0, metricsCount);
+    });
   }
 
-  me.addPercentageMetricData = function(accountId, region, percentage, average, estimatedChargesMetric, callback) {
-
-    function succeeded(input) { console.log(input); callback(null, true); }
-    function failed(input) { callback(null, false); }
-    function errored(err) { callback(err, null); };
-
-    //me.accountId = accountId;
-    //me.localInput.region = region;
-    //me.localInput.metrics = null;
-    //me.callback = callback;
-    var input = {
+  me.listEstimatedChargesMetrics = function(accountId, region) {
+    var params = {
       region: region
     };
-
-    var metricData = JSON.parse(JSON.stringify(me.SGASIncreasedMetricData));
-    metricData.MetricData[0].Timestamp = estimatedChargesMetric.TimeStamp
-    metricData.MetricData[0].Value = percentage;
-    metricData.MetricData[0].Dimensions[0].Value = accountId;
-    metricData.MetricData[1].Timestamp = estimatedChargesMetric.TimeStamp;
-    metricData.MetricData[1].Value = average;
-    metricData.MetricData[1].Dimensions[0].Value = accountId;
-    metricData.MetricData[2].Timestamp = estimatedChargesMetric.TimeStamp;
-    metricData.MetricData[2].Value = estimatedChargesMetric.Maximum;
-    metricData.MetricData[2].Dimensions[0].Value = accountId;
-    input.metricData = metricData;
-
-    var flows = [
-      {func:aws_watch_local.addMetricData, success:succeeded, failure:failed, error:errored},
-    ]
-    aws_watch_local.flows = flows;
-
-    flows[0].func(input);
+    var cloudwatch = new AWS.CloudWatch(params);
+    var metricListQuery = JSON.parse(JSON.stringify(me.AWSEstimatedChargesMetricsListQuery));
+    metricListQuery.Dimensions[0].Value = accountId;
+    return cloudwatch.listMetrics(metricListQuery).promise().then(function(data) {
+      /*
+      {
+        "ResponseMetadata": {
+          "RequestId": "694edcba-0057-11e7-ba01-1587457dbbee"
+        },
+        "Metrics": [
+          {
+            "Namespace": "AWS/Billing",
+            "MetricName": "EstimatedCharges",
+            "Dimensions": [
+              {
+                "Name": "ServiceName",
+                "Value": "AmazonES"
+              },
+              {
+                "Name": "Currency",
+                "Value": "USD"
+              },
+              {
+                "Name": "LinkedAccount",
+                "Value": "089476987273"
+              }
+            ]
+          },
+          ...
+        ]
+      }
+      */
+      var services = [];
+      data.Metrics.forEach( metric => { services.push(metric.Dimensions[0].Value); } );
+      return services;
+    });
   }
 
-  me.addMetricData = function(accountId, creds, localRegion, remoteRegion, current, callback) {
+  me.findLatestEstimatedChargesByServiceMetrics = function(accountId, serviceNames, region, current, metricsCount) {
+    var params = {
+      region: region
+    };
+    var cloudwatch = new AWS.CloudWatch(params);
+    var startTime = new Date(current.getFullYear(), current.getMonth(), current.getDate());
+    //me.current.setHours(me.current.getHours() - 1);
+    startTime.setHours(startTime.getHours() - 24*14);
+    var promises = [];
+    serviceNames.forEach(function(serviceName) {
+      var serviceMetricQuery = JSON.parse(JSON.stringify(me.AWSEstimatedChargesByServiceMetricQuery));
+      serviceMetricQuery.StartTime = startTime;
+      serviceMetricQuery.EndTime = current;
+      serviceMetricQuery.Dimensions[0].Value = accountId;
+      serviceMetricQuery.Dimensions[1].Value = serviceName;
+      promises.push(cloudwatch.getMetricStatistics(serviceMetricQuery).promise().then(function(data) {
+              data.Datapoints.sort(function(a, b){return b.Timestamp - a.Timestamp});
+              return data.Datapoints.splice(0, metricsCount);
+            }));
+    });
+    return Promise.all(promises);
+  }
 
-    me.accountId = accountId;
-    me.localInput.region = localRegion;
-    me.localInput.metrics = null;
-    me.remoteInput.region = remoteRegion;
-    me.remoteInput.metrics = null;
-    me.remoteInput.creds = creds;
-    me.callback = callback;
-    if (current)  me.current = current;
+  me.addPercentageMetricData = function(accountId, region, percentage, average, estimatedCharge, timeStamp) {
+    var params = {
+      region: region
+    };
+    var cloudwatch = new AWS.CloudWatch(params);
+    var metricData = JSON.parse(JSON.stringify(me.SGASIncreasedMetricData));
+    metricData.MetricData[0].Timestamp = timeStamp
+    metricData.MetricData[0].Value = percentage;
+    metricData.MetricData[0].Dimensions[0].Value = accountId;
+    metricData.MetricData[1].Timestamp = timeStamp;
+    metricData.MetricData[1].Value = average;
+    metricData.MetricData[1].Dimensions[0].Value = accountId;
+    metricData.MetricData[2].Timestamp = timeStamp;
+    metricData.MetricData[2].Value = estimatedCharge;
+    metricData.MetricData[2].Dimensions[0].Value = accountId;
+    console.log(metricData);
+    return cloudwatch.putMetricData(metricData).promise();
+  }
 
-    var flows = [
-      {func:buildEstimatedChargesMetricsData, success:aws_watch_remote.findMetricsStatistics, failure:failed, error:errored},
-      {func:aws_watch_remote.findMetricsStatistics, success:buildIncreasedPercentagesMetricQuery, failure:failed, error:errored},
-      {func:buildIncreasedPercentagesMetricQuery, success:aws_watch_local.findMetricsStatistics, failure:failed, error:errored},
-      {func:aws_watch_local.findMetricsStatistics, success:buildIncreasedMetricsData, failure:buildIncreasedMetricsData, error:errored},
-      {func:buildIncreasedMetricsData, success:aws_watch_local.addMetricData, failure:failed, error:errored},
-      {func:aws_watch_local.addMetricData, success:succeeded, failure:failed, error:errored},
-    ]
-    aws_watch_remote.flows = flows;
-    aws_watch_local.flows = flows;
-
-    flows[0].func(me.remoteInput);
+  me.findLatestSGASBillingMetrics = function(accountId, region, current) {
+    var params = {
+      region: region
+    };
+    var cloudwatch = new AWS.CloudWatch(params);
+    var startTime = new Date(current.getFullYear(), current.getMonth(), current.getDate());
+    startTime.setHours(startTime.getHours() - 24*14);
+    var metricQuery = JSON.parse(JSON.stringify(me.SGASBillingMetricQuery));
+    metricQuery.StartTime = startTime;
+    metricQuery.EndTime = current;
+    metricQuery.Dimensions[0].Value = accountId;
+    console.log(JSON.stringify(metricQuery));
+    metricQuery.MetricName = "IncreasedPercentages";
+    metricQuery.Unit = "Percent";
+    return cloudwatch.getMetricStatistics(metricQuery).promise().then(function(data) {
+      data.Datapoints.sort(function(a, b){return b.Timestamp - a.Timestamp});
+      var latestMetrics = {};
+      latestMetrics.percentage = data.Datapoints[0];
+      return latestMetrics;
+    }).then(function(latestMetrics) {
+      metricQuery.MetricName = "AverageCharges";
+      metricQuery.Unit = "None";
+      return cloudwatch.getMetricStatistics(metricQuery).promise().then(function(data) {
+        data.Datapoints.sort(function(a, b){return b.Timestamp - a.Timestamp});
+        latestMetrics.average = data.Datapoints[0];
+        return latestMetrics;
+      });
+    }).then(function(latestMetrics) {
+      metricQuery.MetricName = "EstimatedCharges";
+      metricQuery.Unit = "None";
+      return cloudwatch.getMetricStatistics(metricQuery).promise().then(function(data) {
+        data.Datapoints.sort(function(a, b){return b.Timestamp - a.Timestamp});
+        latestMetrics.estimated = data.Datapoints[0];
+        return latestMetrics;
+      });
+    })
   }
 }
 
