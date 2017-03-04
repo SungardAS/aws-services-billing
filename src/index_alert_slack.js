@@ -6,7 +6,7 @@ var metricsLib = new (require('./metrics'))();
 var generator = require('./alert_message_generator.js');
 
 // The base-64 encoded, encrypted key (CiphertextBlob) stored in the HOOK_URL environment variable
-const hookUrl = process.env.HOOK_URL;
+const slackWebHookUrl = process.env.HOOK_URL;
 // The Slack channel to send a message to stored in the SLACK_CHANNEL environment variable
 const slackChannel = process.env.SLACK_CHANNEL;
 var hookUrl;
@@ -92,8 +92,8 @@ exports.handler = function (event, context) {
         // Container reuse, simply process the event with the key in memory
         processEvent(message, context);
       }
-      else if (hookUrl && hookUrl !== '') {
-        const encryptedBuf = new Buffer(hookUrl, 'base64');
+      else if (slackWebHookUrl && slackWebHookUrl !== '') {
+        const encryptedBuf = new Buffer(slackWebHookUrl, 'base64');
         const cipherText = { CiphertextBlob: encryptedBuf };
         const kms = new AWS.KMS({region:process.env.KMS_REGION});
         kms.decrypt(cipherText, (err, data) => {
