@@ -478,10 +478,8 @@ Resources:
               -
                 Effect: "Allow"
                 Action:
-                  - "dynamodb:GetItem"
-                  - "dynamodb:PutItem"
-                  - "dynamodb:Query"
-                Resource: "arn:aws:dynamodb:*"
+                  - "cloudwatchlogs:*"
+                Resource: "*"
               -
                 Effect: "Allow"
                 Action:
