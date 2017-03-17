@@ -82,13 +82,13 @@ Parameters:
     Type: String
     NoEcho: true
     Description: Plotly API Key
-  SlackWebHookUrl:
+  BillingLogGroupName:
     Type: String
-    NoEcho: true
-    Description: Slack Webhook Url
-  SlackChannel:
+    Default: "/SungardAS/Alerts/Billing"
+    Description: Health Cloudwatch Log Group Name
+  SubscriptionFilterDestinationArn:
     Type: String
-    Description: Slack Channel Name
+    Description: Subscription Filter Destination Arn
 Resources:
   Vpc:
     Type: "AWS::CloudFormation::Stack"
@@ -489,11 +489,11 @@ Resources:
                   - "logs:CreateLogStream"
                   - "logs:PutLogEvents"
                 Resource: "arn:aws:logs:*:*:*"
-  AlertFunction:
+  CloudWatchLogsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: SungardAS-Billing-Alert
-      Handler: index_alert.handler
+      FunctionName: SungardAS-Billing-CloudwatchLogs
+      Handler: index_cloudwatchlogs.handler
       Runtime: nodejs4.3
       CodeUri: ../src
       Role: !GetAtt AlertLambdaFunctionIAMRole.Arn
@@ -514,43 +514,9 @@ Resources:
           S3_BUCKET_NAME: !Ref GraphImageBucket
           PLOTLY_USERNAME: !Ref PlotlyUsername
           PLOTLY_API_KEY: !Ref PlotlyAPIKey
-          DYNAMODB_ALERT_TABLE_NAME: !Ref Table
+          BILLING_LOG_GROUP_NAME: !Ref BillingLogGroupName
           KMS_REGION: !Ref 'AWS::Region'
           KMS_KEY_ID: !Ref EncryptionDecryptionKey
-      Events:
-        BillingAlertTopic:
-          Type: SNS
-          Properties:
-            Topic: !Ref OverIncreasedPercentTopic
-  SlackFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: SungardAS-Billing-Alert-Slack
-      Handler: index_alert_slack.handler
-      Runtime: nodejs4.3
-      CodeUri: ../src
-      Role: !GetAtt AlertLambdaFunctionIAMRole.Arn
-      Timeout: 300
-      VpcConfig:
-        SecurityGroupIds:
-          - !Sub "${SecurityGroups.Outputs.RedshiftSecurityGroupId}"
-        SubnetIds:
-          - !Sub "${PrivateSubnet1.Outputs.SubnetId}"
-          - !Sub "${PrivateSubnet2.Outputs.SubnetId}"
-      Environment:
-        Variables:
-          REDSHIFT_CONNECTION_STRING: !Sub "${RedshiftCluster.Outputs.RedshiftConnectionString}"
-          REDSHIFT_USER: !Ref RedshiftUser
-          REDSHIFT_PASS: !Ref RedshiftPass
-          THRESHOLD_FOR_ALARMS: !Ref AlarmThresholdNumber
-          ALLOWED_AVERAGE_COST: !Ref AllowedAverageCost
-          S3_BUCKET_NAME: !Ref GraphImageBucket
-          PLOTLY_USERNAME: !Ref PlotlyUsername
-          PLOTLY_API_KEY: !Ref PlotlyAPIKey
-          KMS_REGION: !Ref 'AWS::Region'
-          KMS_KEY_ID: !Ref EncryptionDecryptionKey
-          HOOK_URL: !Ref SlackWebHookUrl
-          SLACK_CHANNEL: !Ref SlackChannel
       Events:
         BillingAlertTopic:
           Type: SNS
@@ -560,8 +526,17 @@ Resources:
     Type: AWS::S3::Bucket
   OverIncreasedPercentTopic:
     Type: AWS::SNS::Topic
-  Table:
-    Type: AWS::Serverless::SimpleTable
+  BillingLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Ref BillingLogGroupName
+  SubscriptionFilter:
+    Type: AWS::Logs::SubscriptionFilter
+    DependsOn: BillingLogGroup
+    Properties:
+      LogGroupName: !Ref BillingLogGroupName
+      FilterPattern: ""
+      DestinationArn: !Ref SubscriptionFilterDestinationArn
 Outputs:
   ApiUrl:
     Description: URL of your API endpoint
@@ -581,9 +556,9 @@ Outputs:
   PercentageMetricsLambdaFunctionArn:
     Description: "Lambda Function ARN to Create Increased Percentages Metrics"
     Value: !GetAtt PercentageMetricsFunction.Arn
-  AlertLambdaFunctionArn:
-    Description: "Alert Lambda Function ARN"
-    Value: !GetAtt AlertFunction.Arn
+  CloudWatchLogsLambdaFunctionArn:
+    Description: "CloudWatchLogs Lambda Function ARN"
+    Value: !GetAtt CloudWatchLogsFunction.Arn
   EncryptionDecryptionKeyId:
     Description: "Encryption Decryption KMS Key Id"
     Value: !Ref EncryptionDecryptionKey
