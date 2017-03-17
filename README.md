@@ -58,6 +58,41 @@ Follow steps in <a href="https://aws.amazon.com/blogs/aws/new-upload-aws-cost-us
 
 Once the billing report is created in the S3 bucket, the billing data will be automatically imported to the Redshift.
 
+## How To Send Requests To API
+
+- Find the API url from the 'Output' tab of the "SungardAS-aws-services-billing" stack in the Cloudformation console
+
+### To get the charge differences for all accounts
+```
+path: /billing
+method : GET
+headers: {
+  "Authorization": <refresh_token_from_SSO_server>
+}
+```
+
+### To get the charge differences for all services in a specific account
+```
+path: /billing?account=<<account_id>>
+method : GET
+headers: {
+  "Authorization": <refresh_token_from_SSO_server>
+}
+```
+
+### To run a specific SQL against the Redshift database
+```
+path: /sql
+method : POST
+headers: {
+  "Authorization": <refresh_token_from_SSO_server>
+}
+data:
+{
+  "sql": "<<SQL>>"
+}
+```
+
 ## How To Test Lambda Functions
 
 - $ cd tests

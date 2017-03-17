@@ -142,9 +142,22 @@ module.exports = {
 function mergeAccounts(data) {
   var accounts = {};
   data.current.sum.forEach(function(sum) {
+    //console.log("sum.lineitem_usageaccountid in current : " + sum.lineitem_usageaccountid);
     accounts[sum.lineitem_usageaccountid] = {current: sum};
   });
   data.prev.sum.forEach(function(sum) {
+    //console.log("sum.lineitem_usageaccountid in prev : " + sum.lineitem_usageaccountid);
+    if (!(sum.lineitem_usageaccountid in accounts)) {
+      //console.log("not in accounts");
+      accounts[sum.lineitem_usageaccountid] = {
+        current: {
+          lineitem_usageaccountid: sum.lineitem_usageaccountid,
+          blended: 'n/a',
+          unblended: 'n/a'
+        }
+      };
+    }
+    //console.log("accounts[sum.lineitem_usageaccountid] : " + accounts[sum.lineitem_usageaccountid]);
     accounts[sum.lineitem_usageaccountid].prev = sum;
   });
   Object.keys(accounts).forEach(function(key) {
