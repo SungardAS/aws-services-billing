@@ -6,3 +6,5 @@ dist
 *.local.*
 samTemplate.yaml
 *.yaml1
+*.pyc
+*.sh
