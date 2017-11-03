@@ -243,6 +243,21 @@ Resources:
             Principal:
               AWS: !GetAtt AlertLambdaFunctionIAMRole.Arn
             Resource: '*'
+  SQLTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName : "billing_sql"
+      AttributeDefinitions:
+        -
+          AttributeName: "id"
+          AttributeType: "S"
+      KeySchema:
+        -
+          AttributeName: "id"
+          KeyType: "HASH"
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
   LambdaFunctionIAMRole:
     Type: "AWS::IAM::Role"
     Properties:
@@ -272,6 +287,41 @@ Resources:
                   - "s3:*"
                   - "sts:*"
                   - "ec2:*"
+                Resource: "*"
+              -
+                Effect: "Allow"
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "arn:aws:logs:*:*:*"
+  SQLLambdaFunctionIAMRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      Path: "/"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Sid: "AllowLambdaServiceToAssumeRole"
+            Effect: "Allow"
+            Action:
+              - "sts:AssumeRole"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+      Policies:
+        -
+          PolicyName: "InlinePolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action:
+                  - "dynamodb:GetItem"
+                  - "dynamodb:PutItem"
+                  - "dynamodb:Query"
                 Resource: "*"
               -
                 Effect: "Allow"
@@ -316,6 +366,30 @@ Resources:
             RestApiId: !Ref ApiGatewayApi
             Path: /{proxy+}
             Method: ANY
+  ImportSQLFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: SungardAS-Billing-Import-SQL
+      Handler: index_import_sql.handler
+      Runtime: nodejs4.3
+      CodeUri: ../src
+      Role: !GetAtt SQLLambdaFunctionIAMRole.Arn
+      Timeout: 300
+      VpcConfig:
+        SecurityGroupIds:
+          - !Sub "${SecurityGroups.Outputs.RedshiftSecurityGroupId}"
+        SubnetIds:
+          - !Sub "${PrivateSubnet1.Outputs.SubnetId}"
+          - !Sub "${PrivateSubnet2.Outputs.SubnetId}"
+      Environment:
+        Variables:
+          SQL_TABLE_NAME: !Ref SQLTable
+      Events:
+        BillingDataUpload:
+          Type: S3
+          Properties:
+            Bucket: !Ref Bucket
+            Events: s3:ObjectCreated:*
   ImportFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -340,12 +414,7 @@ Resources:
           REDSHIFT_PASS: !Ref RedshiftPass
           KMS_REGION: !Ref 'AWS::Region'
           KMS_KEY_ID: !Ref EncryptionDecryptionKey
-      Events:
-        BillingDataUpload:
-          Type: S3
-          Properties:
-            Bucket: !Ref Bucket
-            Events: s3:ObjectCreated:*
+          SQL_TABLE_NAME: !Ref SQLTable
   Bucket:
     Type: AWS::S3::Bucket
   MetricsLambdaFunctionIAMRole:
