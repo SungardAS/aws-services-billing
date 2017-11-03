@@ -319,6 +319,11 @@ Resources:
               -
                 Effect: "Allow"
                 Action:
+                  - "ec2:*"
+                Resource: "*"
+              -
+                Effect: "Allow"
+                Action:
                   - "dynamodb:GetItem"
                   - "dynamodb:PutItem"
                   - "dynamodb:Query"
