@@ -113,8 +113,8 @@ def find_billing(cur, account_id, current_date):
 if __name__ == "__main__":
 
     host = os.environ.get('REDSHIFT_HOST_NAME')
-    dbname = os.environ.get('REDSHIFT_DATABSE_NAME')
-    port = os.environ.get('REDSHIFT_DATABSE_PORT')
+    dbname = os.environ.get('REDSHIFT_DATABASE_NAME')
+    port = os.environ.get('REDSHIFT_DATABASE_PORT')
     user = os.environ.get('REDSHIFT_USER_NAME')
     pwd = os.environ.get('REDSHIFT_PASSWORD')
 
