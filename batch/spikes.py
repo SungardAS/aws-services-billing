@@ -1,4 +1,5 @@
 
+import sys
 import os
 import boto3
 import json
@@ -142,62 +143,72 @@ def get_detail_message(account_id, product_code):
     return message
 
 
-current_date = datetime.datetime.utcnow()
-#from_date = datetime.datetime(current_date.year, current_date.month, 1)
-from_date = current_date + relativedelta(days=-1)
-to_date = current_date + relativedelta(days=1)
-min_amount_per_day = 2
-min_amount = min_amount_per_day * current_date.day
-min_increased = 10
+if __name__ == "__main__":
 
-response = compare_table.scan(
-    FilterExpression="(#unblended_diff_1 > :min_amount or #unblended_diff_2 > :min_amount) and (#unblended_inc_diff_1 > :min_increased or #unblended_inc_diff_2 > :min_increased) and #start >= :start and #end < :end",
-    ExpressionAttributeNames={
-      '#unblended_diff_1': 'unblended_diff_1',
-      '#unblended_diff_2': 'unblended_diff_2',
-      '#unblended_inc_diff_1': 'unblended_inc_diff_1',
-      '#unblended_inc_diff_2': 'unblended_inc_diff_2',
-      '#start': 'datetime',
-      '#end': 'datetime'
-    },
-    ExpressionAttributeValues={
-      ':min_amount': min_amount,
-      ':min_increased': min_increased,
-      ':start': from_date.strftime('%Y-%m-%d'),
-      ':end': to_date.strftime('%Y-%m-%d')
-    }
-)
-#print("there are %d items found" % len(response['Items']))
+    if len(sys.argv) == 1:
+        current_date = datetime.datetime.utcnow()
+    else:
+        current_date = parser.parse(sys.argv[1])
+        current_date = datetime.datetime(current_date.year, current_date.month, 1)
+        current_date = current_date + relativedelta(months=1) + relativedelta(days=-1)
+    print("cuurent_date = %s" % current_date)
 
-result = {}
-for item in response['Items']:
-    account_id = item['account_id']
-    product_code = item['product_code']
-    compared = json.loads(item['compared'])
-    # change the float to decimal
-    for blended in compared['blended']:
-        blended['charge'] = decimal.Decimal('%.2f' % blended['charge'])
-        if blended['increased']:
-            blended['increased'] = decimal.Decimal('%.2f' % blended['increased'])
-    for unblended in compared['unblended']:
-        unblended['charge'] = decimal.Decimal('%.2f' % unblended['charge'])
-        if unblended['increased']:
-            unblended['increased'] = decimal.Decimal('%.2f' % unblended['increased'])
-    compared['id'] = item['id']
-    compared['account_name'] = get_account_info(account_id)['Name']
-    compared['datetime'] = item['datetime']
-    image_file_path = draw_bar(account_id, product_code, compared)
-    compared['image_file_path'] = "https://s3.amazonaws.com/%s/%s" % (s3_graph_bucket, image_file_path)
-    print('%s' % compared)
-    spike_table.create(compared)
-    if account_id not in result:
-        result[account_id] = {}
-    result[account_id][product_code] = compared
+    #current_date = datetime.datetime.utcnow()
+    #from_date = datetime.datetime(current_date.year, current_date.month, 1)
+    from_date = current_date + relativedelta(days=-1)
+    to_date = current_date + relativedelta(days=1)
+    min_amount_per_day = 2
+    min_amount = min_amount_per_day * current_date.day
+    min_increased = 10
 
-print("\n%s" % get_summary_message(result))
+    response = compare_table.scan(
+        FilterExpression="(#unblended_diff_1 > :min_amount or #unblended_diff_2 > :min_amount) and (#unblended_inc_diff_1 > :min_increased or #unblended_inc_diff_2 > :min_increased) and #start >= :start and #end < :end",
+        ExpressionAttributeNames={
+          '#unblended_diff_1': 'unblended_diff_1',
+          '#unblended_diff_2': 'unblended_diff_2',
+          '#unblended_inc_diff_1': 'unblended_inc_diff_1',
+          '#unblended_inc_diff_2': 'unblended_inc_diff_2',
+          '#start': 'datetime',
+          '#end': 'datetime'
+        },
+        ExpressionAttributeValues={
+          ':min_amount': min_amount,
+          ':min_increased': min_increased,
+          ':start': from_date.strftime('%Y-%m-%d'),
+          ':end': to_date.strftime('%Y-%m-%d')
+        }
+    )
+    #print("there are %d items found" % len(response['Items']))
 
-for account_id in result.keys():
-    #print("account_id : %s" % account_id)
-    for product_code in result[account_id].keys():
-        #print("\tproduct_code : %s" % product_code)
-        print("\n%s" % get_detail_message(account_id, product_code))
+    result = {}
+    for item in response['Items']:
+        account_id = item['account_id']
+        product_code = item['product_code']
+        compared = json.loads(item['compared'])
+        # change the float to decimal
+        for blended in compared['blended']:
+            blended['charge'] = decimal.Decimal('%.2f' % blended['charge'])
+            if blended['increased']:
+                blended['increased'] = decimal.Decimal('%.2f' % blended['increased'])
+        for unblended in compared['unblended']:
+            unblended['charge'] = decimal.Decimal('%.2f' % unblended['charge'])
+            if unblended['increased']:
+                unblended['increased'] = decimal.Decimal('%.2f' % unblended['increased'])
+        compared['id'] = item['id']
+        compared['account_name'] = get_account_info(account_id)['Name']
+        compared['datetime'] = item['datetime']
+        image_file_path = draw_bar(account_id, product_code, compared)
+        compared['image_file_path'] = "https://s3.amazonaws.com/%s/%s" % (s3_graph_bucket, image_file_path)
+        print('%s' % compared)
+        spike_table.create(compared)
+        if account_id not in result:
+            result[account_id] = {}
+        result[account_id][product_code] = compared
+
+    print("\n%s" % get_summary_message(result))
+
+    for account_id in result.keys():
+        #print("account_id : %s" % account_id)
+        for product_code in result[account_id].keys():
+            #print("\tproduct_code : %s" % product_code)
+            print("\n%s" % get_detail_message(account_id, product_code))

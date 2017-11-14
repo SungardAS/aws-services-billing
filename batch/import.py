@@ -1,10 +1,11 @@
 
 import psycopg2
 
+import sys
 import os
 import datetime
 from dateutil.relativedelta import relativedelta
-#from dateutil import parser
+from dateutil import parser
 
 #import threading
 from accounts import find_accounts #, find_services
@@ -31,11 +32,11 @@ def build_sql(from_date, to_date, table_date):
     return sql
 
 
-def import_billing(cur, account_id, dynamodb):
+def import_billing(cur, account_id, dynamodb, current_date):
 
     print("starting filling today's billing data of account %s" % account_id)
 
-    current_date = datetime.datetime.utcnow()
+    #current_date = datetime.datetime.utcnow()
     prev_date = current_date + relativedelta(days=-1)
     next_date = current_date + relativedelta(days=1)
 
@@ -74,11 +75,11 @@ def import_billing(cur, account_id, dynamodb):
 
 def save_billing(rows, dynamodb):
     for row in rows:
-        print("%s,%s,%s,%s,%s,%s" % (row[0], row[1], row[2], row[3], row[4], row[5]))
+        #print("%s,%s,%s,%s,%s,%s" % (row[0], row[1], row[2], row[3], row[4], row[5]))
         id = '%s_%s_%s' % (row[1], row[2], row[0])
         blended = decimal.Decimal(row[4])
         unblended = decimal.Decimal(row[5])
-        print('id: %s' % id)
+        #print('id: %s' % id)
         item = dynamodb.find_by_id(id)
         if item:
             print('item found %s' % item)
@@ -104,46 +105,56 @@ def save_billing(rows, dynamodb):
                 dynamodb.create(item)
 
 
-def import_account(cur, account_id, dynamodb):
+def import_account(cur, account_id, dynamodb, current_date):
     print("starting billing import of account %s" % account_id)
-    predicted = import_billing(cur, account_id, dynamodb)
+    predicted = import_billing(cur, account_id, dynamodb, current_date)
     if predicted is not None:
         save_predicted(account_id, product_code, predicted, dynamodb)
     print("completed billing import of account %s" % account_id)
 
 
-host = os.environ.get('REDSHIFT_HOST_NAME')
-dbname = os.environ.get('REDSHIFT_DATABSE_NAME')
-port = os.environ.get('REDSHIFT_DATABSE_PORT')
-user = os.environ.get('REDSHIFT_USER_NAME')
-pwd = os.environ.get('REDSHIFT_PASSWORD')
+if __name__ == "__main__":
 
-con = psycopg2.connect(dbname=dbname, host=host, port=port, user=user, password=pwd)
-cur = con.cursor()
+    host = os.environ.get('REDSHIFT_HOST_NAME')
+    dbname = os.environ.get('REDSHIFT_DATABSE_NAME')
+    port = os.environ.get('REDSHIFT_DATABSE_PORT')
+    user = os.environ.get('REDSHIFT_USER_NAME')
+    pwd = os.environ.get('REDSHIFT_PASSWORD')
 
-region = os.environ.get('AWS_DEFAULT_REGION')
-table_name = os.environ.get('DYNAMODB_TABLE_NAME')
-client = boto3.resource('dynamodb', region_name=region)
-dynamodb = Dynamodb(client, table_name)
+    con = psycopg2.connect(dbname=dbname, host=host, port=port, user=user, password=pwd)
+    cur = con.cursor()
 
-accounts = find_accounts()
-print('\n\n***accounts = %s' % accounts)
+    region = os.environ.get('AWS_DEFAULT_REGION')
+    table_name = os.environ.get('DYNAMODB_TABLE_NAME')
+    client = boto3.resource('dynamodb', region_name=region)
+    dynamodb = Dynamodb(client, table_name)
 
-#threads = []
-for account_id in accounts:
-    print(account_id)
+    accounts = find_accounts()
+    print('\n\n***accounts = %s' % accounts)
+
+    if len(sys.argv) == 1:
+        current_date = datetime.datetime.utcnow()
+    else:
+        current_date = parser.parse(sys.argv[1])
+        current_date = datetime.datetime(current_date.year, current_date.month, 1)
+        current_date = current_date + relativedelta(months=1) + relativedelta(days=-1)
+    print("cuurent_date = %s" % current_date)
+
+    #threads = []
+    for account_id in accounts:
+        print(account_id)
+        import_account(cur, account_id, dynamodb, current_date)
+        #t = threading.Thread(target=predict_account, args=(account_id, ))
+        #threads.append(t)
+        #t.start()
+
+    #for thread in threads:
+    #    thread.join()
+
+    """
+    account_id = '427004835786'
     import_account(cur, account_id, dynamodb)
-    #t = threading.Thread(target=predict_account, args=(account_id, ))
-    #threads.append(t)
-    #t.start()
+    """
 
-#for thread in threads:
-#    thread.join()
-
-"""
-account_id = '427004835786'
-import_account(cur, account_id, dynamodb)
-"""
-
-cur.close()
-con.close()
+    cur.close()
+    con.close()

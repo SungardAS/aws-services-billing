@@ -1,5 +1,7 @@
 
 from __future__ import print_function # Python 2/3 compatibility
+
+import sys
 import os
 import json
 import boto3
@@ -297,70 +299,80 @@ def save(current_date, result_list, dynamodb, cur):
     dynamodb.create(item)
 """
 
-host = os.environ.get('REDSHIFT_HOST_NAME')
-dbname = os.environ.get('REDSHIFT_DATABSE_NAME')
-port = os.environ.get('REDSHIFT_DATABSE_PORT')
-user = os.environ.get('REDSHIFT_USER_NAME')
-pwd = os.environ.get('REDSHIFT_PASSWORD')
+if __name__ == "__main__":
 
-con = psycopg2.connect(dbname=dbname, host=host, port=port, user=user, password=pwd)
-cur = con.cursor()
+    host = os.environ.get('REDSHIFT_HOST_NAME')
+    dbname = os.environ.get('REDSHIFT_DATABSE_NAME')
+    port = os.environ.get('REDSHIFT_DATABSE_PORT')
+    user = os.environ.get('REDSHIFT_USER_NAME')
+    pwd = os.environ.get('REDSHIFT_PASSWORD')
 
-region = os.environ.get('AWS_DEFAULT_REGION')
-table_name = os.environ.get('DYNAMODB_TABLE_NAME')
-compare_table_name = os.environ.get('DYNAMODB_COMPARE_TABLE_NAME')
-client = boto3.resource('dynamodb', region_name=region)
-table = client.Table(table_name)
-dynamodb = Dynamodb(client, compare_table_name)
+    con = psycopg2.connect(dbname=dbname, host=host, port=port, user=user, password=pwd)
+    cur = con.cursor()
 
-current_date = datetime.datetime.utcnow()
-prev_date = current_date + relativedelta(days=-1)
-#prev_date = current_date
-next_date = current_date + relativedelta(days=1)
+    region = os.environ.get('AWS_DEFAULT_REGION')
+    table_name = os.environ.get('DYNAMODB_TABLE_NAME')
+    compare_table_name = os.environ.get('DYNAMODB_COMPARE_TABLE_NAME')
+    client = boto3.resource('dynamodb', region_name=region)
+    table = client.Table(table_name)
+    dynamodb = Dynamodb(client, compare_table_name)
 
-print("\n+++++finding items with no max")
-# find items with NO predictions
-response = table.scan(
-    FilterExpression="attribute_not_exists(yhat) and attribute_exists(blended) and #start >= :start and #end < :end",
-    ExpressionAttributeNames={'#start': 'datetime', '#end': 'datetime'},
-    ExpressionAttributeValues={':start': prev_date.strftime('%Y-%m-%d'), ':end': next_date.strftime('%Y-%m-%d')}
-)
-print(len(response['Items']))
-no_predictions = {}
-for item in response['Items']:
-    build(item, no_predictions)
-#print(no_predictions)
-save(current_date, no_predictions, dynamodb, cur)
+    if len(sys.argv) == 1:
+        current_date = datetime.datetime.utcnow()
+    else:
+        current_date = parser.parse(sys.argv[1])
+        current_date = datetime.datetime(current_date.year, current_date.month, 1)
+        current_date = current_date + relativedelta(months=1) + relativedelta(days=-1)
+    print("cuurent_date = %s" % current_date)
 
-# find items whos has both predictions and blended/unblended
-print("\n\n+++++finding items with spikes")
-"""ScanFilter={
-    'yhat': {'ComparisonOperator': 'NOT_NULL'},
-    'blended': {'ComparisonOperator': 'NOT_NULL'}
-    'datetime': {
-        'AttributeValueList': [{'S': prev_date.strftime('%Y-%m-%d')}],
-        'ComparisonOperator': 'GE'
-    }
-    'datetime': {
-        'AttributeValueList': [{'S': current_date.strftime('%Y-%m-%d')}],
-        'ComparisonOperator': 'LE'
-    }
-},"""
-response = table.scan(
-    FilterExpression="attribute_exists(yhat) and attribute_exists(blended) and #start >= :start and #end < :end",
-    ExpressionAttributeNames={'#start': 'datetime', '#end': 'datetime'},
-    ExpressionAttributeValues={':start': prev_date.strftime('%Y-%m-%d'), ':end': next_date.strftime('%Y-%m-%d')}
-)
-print(len(response['Items']))
-spike_compares = {}
-for item in response['Items']:
-    #if item['yhat_upper_exp'] < item['blended'] or item['yhat_upper_exp'] < item['unblended']:
-    if item['yhat_exp'] < item['unblended']:
-        #print("spike found: %s\t%s\t%s\t%s\t%s\t%s" % (item['account_id'], item['product_code'], item['datetime'], item['blended'], item['unblended'], item['yhat_upper_exp']))
-        build(item, spike_compares)
-#print(spike_compares)
-save(current_date, spike_compares, dynamodb, cur)
+    #current_date = datetime.datetime.utcnow()
+    prev_date = current_date + relativedelta(days=-1)
+    #prev_date = current_date
+    next_date = current_date + relativedelta(days=1)
+
+    print("\n+++++finding items with no max")
+    # find items with NO predictions
+    response = table.scan(
+        FilterExpression="attribute_not_exists(yhat) and attribute_exists(blended) and #start >= :start and #end < :end",
+        ExpressionAttributeNames={'#start': 'datetime', '#end': 'datetime'},
+        ExpressionAttributeValues={':start': prev_date.strftime('%Y-%m-%d'), ':end': next_date.strftime('%Y-%m-%d')}
+    )
+    print(len(response['Items']))
+    no_predictions = {}
+    for item in response['Items']:
+        build(item, no_predictions)
+    #print(no_predictions)
+    save(current_date, no_predictions, dynamodb, cur)
+
+    # find items whos has both predictions and blended/unblended
+    print("\n\n+++++finding items with spikes")
+    """ScanFilter={
+        'yhat': {'ComparisonOperator': 'NOT_NULL'},
+        'blended': {'ComparisonOperator': 'NOT_NULL'}
+        'datetime': {
+            'AttributeValueList': [{'S': prev_date.strftime('%Y-%m-%d')}],
+            'ComparisonOperator': 'GE'
+        }
+        'datetime': {
+            'AttributeValueList': [{'S': current_date.strftime('%Y-%m-%d')}],
+            'ComparisonOperator': 'LE'
+        }
+    },"""
+    response = table.scan(
+        FilterExpression="attribute_exists(yhat) and attribute_exists(blended) and #start >= :start and #end < :end",
+        ExpressionAttributeNames={'#start': 'datetime', '#end': 'datetime'},
+        ExpressionAttributeValues={':start': prev_date.strftime('%Y-%m-%d'), ':end': next_date.strftime('%Y-%m-%d')}
+    )
+    print(len(response['Items']))
+    spike_compares = {}
+    for item in response['Items']:
+        #if item['yhat_upper_exp'] < item['blended'] or item['yhat_upper_exp'] < item['unblended']:
+        if item['yhat_exp'] < item['unblended']:
+            #print("spike found: %s\t%s\t%s\t%s\t%s\t%s" % (item['account_id'], item['product_code'], item['datetime'], item['blended'], item['unblended'], item['yhat_upper_exp']))
+            build(item, spike_compares)
+    #print(spike_compares)
+    save(current_date, spike_compares, dynamodb, cur)
 
 
-cur.close()
-con.close()
+    cur.close()
+    con.close()

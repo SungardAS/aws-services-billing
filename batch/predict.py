@@ -50,7 +50,7 @@ import decimal
     #print(product_code_df.groupby(['enddatetime'], as_index=False).mean().sort_values(by='usage_amount', ascending=False))
 """
 
-def predict(df, product_code):
+def predict(df, product_code, current_date):
 
     product_df = df[df['lineitem_productcode'] == product_code]
     product_df = product_df.filter(items=['enddatetime', 'unblended'])
@@ -62,7 +62,7 @@ def predict(df, product_code):
         print("No data in product %s" % product_code)
         return None
 
-    current_date = datetime.datetime.utcnow()
+    #current_date = datetime.datetime.utcnow()
     prev_date = current_date + relativedelta(days=-1)
     prev_date_str = prev_date.strftime("%Y-%m-%d")
     tail_date_str = parser.parse(prophet_df.tail(1)['ds'].iloc[0]).strftime("%Y-%m-%d")
@@ -137,13 +137,13 @@ def save_predicted(account_id, product_code, predicted, dynamodb):
         dynamodb.create(item)
 
 
-def predict_account(account_id, dynamodb):
+def predict_account(account_id, dynamodb, current_date):
     print("starting billing prediction of account %s" % account_id)
     #services = find_services(account_id)
     #print('services = %s' % services)
 
     # read all data files of this account
-    current_date = datetime.datetime.utcnow()
+    #current_date = datetime.datetime.utcnow()
     next_date = datetime.datetime(2016, 8, 1)
     filepath = './data/%s_%s.csv' % (account_id, next_date.strftime('%Y%m'))
     print("account, %s, reading a file, %s" % (account_id, filepath))
@@ -177,6 +177,9 @@ def predict_account(account_id, dynamodb):
         print("!!!There is no data file for account, %s" % account_id)
         return
 
+    # truncate data after the given date
+    df = df[df['enddatetime'] < "%4d-%02d-%02d" % (current_date.year, current_date.month, current_date.day)]
+
     # data filtering
     if account_id == '054649790173':
         df = df[(df['lineitem_productcode'] != 'AmazonRedshift') | (df['enddatetime'] < '2016-11-07 23:00:00') | (df['enddatetime'] > '2016-12-19 18:00:00')]
@@ -190,35 +193,45 @@ def predict_account(account_id, dynamodb):
         #    print("!!!product '%s' is not a valid service in account '%s'" % (product_code, account_id))
         #    continue
         #draw(product_code)
-        predicted = predict(df, product_code)
+        predicted = predict(df, product_code, current_date)
         if predicted is not None:
             save_predicted(account_id, product_code, predicted, dynamodb)
     print("completed billing prediction of account %s" % account_id)
 
 
-"""max_end_time = find_max_end_time(cur)
-if max_end_time != "23:00":
-    print("The last time data is not available now, so don't predict yet")
-    sys.exit()
-"""
+if __name__ == "__main__":
 
-#threads = []
-accounts = find_accounts()
-print('\n\n***accounts = %s' % accounts)
+    """max_end_time = find_max_end_time(cur)
+    if max_end_time != "23:00":
+        print("The last time data is not available now, so don't predict yet")
+        sys.exit()
+    """
+
+    #threads = []
+    accounts = find_accounts()
+    print('\n\n***accounts = %s' % accounts)
 
 
-region = os.environ.get('AWS_DEFAULT_REGION')
-table_name = os.environ.get('DYNAMODB_TABLE_NAME')
-client = boto3.resource('dynamodb', region_name=region)
-dynamodb = Dynamodb(client, table_name)
+    region = os.environ.get('AWS_DEFAULT_REGION')
+    table_name = os.environ.get('DYNAMODB_TABLE_NAME')
+    client = boto3.resource('dynamodb', region_name=region)
+    dynamodb = Dynamodb(client, table_name)
 
-#threads = []
-for account_id in accounts:
-    print(account_id)
-    predict_account(account_id, dynamodb)
-    #t = threading.Thread(target=predict_account, args=(account_id, ))
-    #threads.append(t)
-    #t.start()
+    if len(sys.argv) == 1:
+        current_date = datetime.datetime.utcnow()
+    else:
+        current_date = parser.parse(sys.argv[1])
+        current_date = datetime.datetime(current_date.year, current_date.month, 1)
+        current_date = current_date + relativedelta(months=1) + relativedelta(days=-1)
+    print("cuurent_date = %s" % current_date)
 
-#for thread in threads:
-#    thread.join()
+    #threads = []
+    for account_id in accounts:
+        print(account_id)
+        predict_account(account_id, dynamodb, current_date)
+        #t = threading.Thread(target=predict_account, args=(account_id, ))
+        #threads.append(t)
+        #t.start()
+
+    #for thread in threads:
+    #    thread.join()

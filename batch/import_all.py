@@ -1,11 +1,11 @@
 
 import psycopg2
 
-#import sys
+import sys
 import os
 import datetime
 from dateutil.relativedelta import relativedelta
-#from dateutil import parser
+from dateutil import parser
 
 #import pandas as pd
 #import numpy as np
@@ -22,13 +22,13 @@ from accounts import find_accounts #, find_services
 import_all = os.environ.get('BILLING_IMPORT_ALL_DATA')
 
 
-def find_billing(cur, account_id):
+def find_billing(cur, account_id, current_date):
 
     print("starting billing import of account %s" % account_id)
 
     #fwrite = open('./data/%s.csv' % (account_id), 'w')
 
-    current_date = datetime.datetime.utcnow()
+    #current_date = datetime.datetime.utcnow()
     #current_date = datetime.datetime(2017,3,1)
     if import_all == 'True':
         start_date = datetime.datetime(2016, 8, 1)
@@ -64,9 +64,9 @@ def find_billing(cur, account_id):
         sql += " order by enddatetime, lineItem_UsageAccountId, lineitem_productcode"
         #sql += ", product_servicecode, lineitem_operation, lineitem_usagetype"
         #print(sql);
-        """print('start_date : %s' % start_date)
+        print('start_date : %s' % start_date)
         print('next_date : %s' % next_date)
-        start_date = next_date"""
+        """start_date = next_date"""
 
         cur.execute(sql)
         #data = [("%s,%s" % (str(a[0]), a[1])) for a in cur.fetchall()]
@@ -110,28 +110,37 @@ def find_billing(cur, account_id):
     #print(product_code_df.groupby(['enddatetime'], as_index=False).mean().sort_values(by='usage_amount', ascending=False))
 """
 
-host = os.environ.get('REDSHIFT_HOST_NAME')
-dbname = os.environ.get('REDSHIFT_DATABSE_NAME')
-port = os.environ.get('REDSHIFT_DATABSE_PORT')
-user = os.environ.get('REDSHIFT_USER_NAME')
-pwd = os.environ.get('REDSHIFT_PASSWORD')
+if __name__ == "__main__":
 
-con = psycopg2.connect(dbname=dbname, host=host, port=port, user=user, password=pwd)
-cur = con.cursor()
+    host = os.environ.get('REDSHIFT_HOST_NAME')
+    dbname = os.environ.get('REDSHIFT_DATABSE_NAME')
+    port = os.environ.get('REDSHIFT_DATABSE_PORT')
+    user = os.environ.get('REDSHIFT_USER_NAME')
+    pwd = os.environ.get('REDSHIFT_PASSWORD')
 
-#threads = []
-accounts = find_accounts()
-print('\n\n***accounts = %s' % accounts)
+    con = psycopg2.connect(dbname=dbname, host=host, port=port, user=user, password=pwd)
+    cur = con.cursor()
 
+    #threads = []
+    accounts = find_accounts()
+    print('\n\n***accounts = %s' % accounts)
 
-for account_id in accounts:
-    find_billing(cur, account_id)
-    #t = threading.Thread(target=find_billing, args=(cur, account_id, ))
-    #threads.append(t)
-    #t.start()
+    if len(sys.argv) == 1:
+        current_date = datetime.datetime.utcnow()
+    else:
+        current_date = parser.parse(sys.argv[1])
+        current_date = datetime.datetime(current_date.year, current_date.month, 1)
+        current_date = current_date + relativedelta(months=1) + relativedelta(days=-1)
+    print("cuurent_date = %s" % current_date)
 
-#for thread in threads:
-#    thread.join()
+    for account_id in accounts:
+        find_billing(cur, account_id, current_date)
+        #t = threading.Thread(target=find_billing, args=(cur, account_id, ))
+        #threads.append(t)
+        #t.start()
 
-cur.close()
-con.close()
+    #for thread in threads:
+    #    thread.join()
+
+    cur.close()
+    con.close()
