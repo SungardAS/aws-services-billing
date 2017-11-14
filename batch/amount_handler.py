@@ -1,6 +1,6 @@
 
 ######################################################################################################################
-# This is a lambda function to provide "billing spikes" information stored in billing dynamodb table, 'billing_spikes'
+# This is a lambda function to provide "billing amount" information stored in billing dynamodb table, 'billing_aggrs'
 ######################################################################################################################
 
 import os
