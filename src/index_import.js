@@ -27,8 +27,7 @@ exports.handler = (event, context, callback) => {
     console.log(data.Items);
     if (data.Items.length == 0) {
       console.log("no new sql, so just return");
-      callback(null, null);
-      return false;
+      callback(null, false);
     }
     else {
       console.log("We've got a new billing file, " + data.Items[0]);
@@ -85,7 +84,7 @@ exports.handler = (event, context, callback) => {
           pgp.end();
           callback(err);
         });
-      }).then(function(sqlStr) {
+      }).then(function(result) {
         // set this item processed
         itemToProcess['processedAt'] = (new Date()).toISOString();
         var params = {
@@ -94,7 +93,7 @@ exports.handler = (event, context, callback) => {
         };
         return documentClient.put(params).promise().then(function(data) {
           console.log(data);
-          return true;
+          callback(null, true);
         }).catch(function(err) {
           console.log(err);
           callback(err);

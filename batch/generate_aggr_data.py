@@ -40,7 +40,7 @@ def generate_aggr_data(cur, dynamodb, current_date, account_id=None):
         sql += " sum(cast(lineItem_BlendedCost as float)) blended,"
         sql += " sum(cast(lineitem_unblendedcost as float)) unblended"
         sql += " from AWSBilling%s" % (current_date.strftime('%Y%m'))
-        sql += " where lineitem_usageenddate <= '%s'" % (current_date.strftime('%Y-%m-%dT%H:%M:%SZ'))
+        sql += " where lineitem_usageenddate < '%s'" % ((current_date + relativedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%SZ'))
         sql += " and lineItem_UsageAccountId = '%s'" % (account_id)
         sql += " group by lineItem_UsageAccountId"
     else:
@@ -49,7 +49,7 @@ def generate_aggr_data(cur, dynamodb, current_date, account_id=None):
         sql += " sum(cast(lineItem_BlendedCost as float)) blended,"
         sql += " sum(cast(lineitem_unblendedcost as float)) unblended"
         sql += " from AWSBilling%s" % (current_date.strftime('%Y%m'))
-        sql += " where lineitem_usageenddate <= '%s'" % (current_date.strftime('%Y-%m-%dT%H:%M:%SZ'))
+        sql += " where lineitem_usageenddate < '%s'" % ((current_date + relativedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%SZ'))
     print(sql);
     cur.execute(sql)
     for row in cur.fetchall():
@@ -62,7 +62,7 @@ def generate_aggr_data(cur, dynamodb, current_date, account_id=None):
         sql += " sum(cast(lineItem_BlendedCost as float)) blended,"
         sql += " sum(cast(lineitem_unblendedcost as float)) unblended"
         sql += " from AWSBilling%s" % (current_date.strftime('%Y%m'))
-        sql += " where lineitem_usageenddate <= '%s'" % (current_date.strftime('%Y-%m-%dT%H:%M:%SZ'))
+        sql += " where lineitem_usageenddate < '%s'" % ((current_date + relativedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%SZ'))
         sql += " and lineItem_UsageAccountId = '%s'" % (account_id)
         sql += " group by lineItem_UsageAccountId, lineitem_productcode"
         sql += " order by lineItem_UsageAccountId, lineitem_productcode"
@@ -72,7 +72,7 @@ def generate_aggr_data(cur, dynamodb, current_date, account_id=None):
         sql += " sum(cast(lineItem_BlendedCost as float)) blended,"
         sql += " sum(cast(lineitem_unblendedcost as float)) unblended"
         sql += " from AWSBilling%s" % (current_date.strftime('%Y%m'))
-        sql += " where lineitem_usageenddate <= '%s'" % (current_date.strftime('%Y-%m-%dT%H:%M:%SZ'))
+        sql += " where lineitem_usageenddate < '%s'" % ((current_date + relativedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%SZ'))
         sql += "group by lineitem_productcode"
         sql += " order by lineitem_productcode"
     print(sql);
