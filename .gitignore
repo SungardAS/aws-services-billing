@@ -10,3 +10,5 @@ samTemplate.yaml
 *.sh
 *.nogit
 .ipynb_checkpoints
+tests
+spikes
