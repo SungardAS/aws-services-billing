@@ -1,0 +1,40 @@
+
+Server
+ssh -i ~/CTO/alex_054649790173key.pem ec2-user@ec2-52-90-116-205.compute-1.amazonaws.com  # billing master
+
+==================================================================================================================================
+
+# crontab -e
+
+*/20 * * * * /home/ec2-user/aws-services-billing/import.sh > /home/ec2-user/aws-services-billing/logs/import.log 2>&1
+50 * * * * /home/ec2-user/aws-services-billing/spikes.sh > /home/ec2-user/aws-services-billing/logs/spikes.log 2>&1
+
+
+# crontab -l
+# crontab -u username -l
+
+==================================================================================================================================
+
+To remove or erase all crontab jobs use the following command:
+# Delete the current cron jobs #
+crontab -r
+
+
+Delete job for specific user. Must be run as root user ##
+crontab -r -u username
+
+
+To log output
+*/5 * * * * /home/ec2-user/aws-services-billing/import.sh > /var/log/myjob.log 2>&1
+
+
+To stop receiving email output from crontab, you need to append >/dev/null 2>&1
+*/5 * * * * /home/ec2-user/aws-services-billing/import.sh >/dev/null 2>&1
+
+To mail output to particular email account let us say vivek@nixcraft.in you need to define MAILTO variable as follows:
+MAILTO="vivek@nixcraft.in"
+0 3 * * * /root/backup.sh >/dev/null 2>&1
+
+
+cron log
+# vi /var/log/cron
