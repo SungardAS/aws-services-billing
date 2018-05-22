@@ -11,6 +11,7 @@ phases:
       - sed -i "s/AWS::CUSTOM_AUTHORIZER_LAMBDA_NAME/$CUSTOM_AUTHORIZER_LAMBDA_NAME/g" swagger.yaml
       - sed -i "s/AWS::CUSTOM_AUTHORIZER_ROLE_NAME/$CUSTOM_AUTHORIZER_ROLE_NAME/g" swagger.yaml
       - cd src; npm install; cd ..
+      - find src/node_modules/ieee754 -print -exec touch {} \;  # ZIP does not support timestamps before 1980
       - aws cloudformation package
          --template-file ./templates/template.yaml
          --s3-bucket $S3_BUCKET_NAME
