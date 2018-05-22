@@ -7,8 +7,9 @@ dist
 samTemplate.yaml
 *.yaml1
 *.pyc
-*.sh
 *.nogit
 .ipynb_checkpoints
 tests
 spikes
+.*.local
+package-lock.json

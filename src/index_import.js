@@ -3,10 +3,12 @@
 let AWS = require('aws-sdk');
 let pgp = require('pg-promise')();
 let kms = require('aws-services-lib/aws_promise/kms');
+var lawgs = require("lawgs")
+
+var LOG_GROUP_NAME = "/SungardAS/billing/import";
+var LOG_STREAM_NAME = new Date().toISOString().replace(/:/g, "-");
 
 exports.handler = (event, context, callback) => {
-
-  console.log('Received event:', JSON.stringify(event, null, 2));
 
   let region = process.env.AWS_DEFAULT_REGION;
   let kmsRegion = process.env.BUCKET_REGION;
@@ -17,6 +19,11 @@ exports.handler = (event, context, callback) => {
   let redshiftUser = process.env.REDSHIFT_USER;
   let redshiftPass = process.env.REDSHIFT_PASS;
 
+  lawgs.config({aws:{region: region}})
+  var logger = lawgs.getOrCreate(LOG_GROUP_NAME);
+
+  logger.log(LOG_STREAM_NAME, 'Received event:', JSON.stringify(event, null, 2));
+
   // Get the sql from the dynamodb
   var documentClient = new AWS.DynamoDB.DocumentClient({region: region});
   var params = {
@@ -24,13 +31,13 @@ exports.handler = (event, context, callback) => {
     FilterExpression: 'attribute_not_exists(processedAt)'
   };
   return documentClient.scan(params).promise().then(function(data) {
-    console.log(data.Items);
+    logger.log(LOG_STREAM_NAME, data.Items);
     if (data.Items.length == 0) {
-      console.log("no new sql, so just return");
-      callback(null, false);
+      logger.log(LOG_STREAM_NAME, "no new sql, so just return");
+      return callback(null, false);
     }
     else {
-      console.log("We've got a new billing file, " + data.Items[0]);
+      logger.log(LOG_STREAM_NAME, "We've got a new billing file, " + data.Items[0]);
       var tokens = data.Items[0].id.split('/');
       var itemToProcess = data.Items[0];
       var yearMonth = tokens[2].split('-')[0].substring(0, 6);
@@ -50,13 +57,13 @@ exports.handler = (event, context, callback) => {
           Key: data.Items[0].key
         }
         return s3.getObject(params).promise().then(function(data) {
-          //console.log(data.Body.toString());
+          //logger.log(LOG_STREAM_NAME, data.Body.toString());
           var sqlStr = data.Body.toString().replace('<AWS_ROLE>', bucketIAMRoleArn).replace("<S3_BUCKET_REGION>", "'" + bucketRegion + "'");
-          console.log(sqlStr);
+          logger.log(LOG_STREAM_NAME, sqlStr);
           return sqlStr;
         }).catch(function(err) {
-          console.log(err);
-          callback(err);
+          logger.log(LOG_STREAM_NAME, err);
+          return callback(err);
         });
       }).then(function(sqlStr) {
         // get the connection to redshit
@@ -64,25 +71,25 @@ exports.handler = (event, context, callback) => {
         // drop the current month table first if exists
         var redshiftDropTableSqlString = "drop table AWSBilling<Year_Month>; drop table AWSBilling<Year_Month>_tagMapping;";
         redshiftDropTableSqlString = redshiftDropTableSqlString.replace("<Year_Month>", yearMonth).replace("<Year_Month>", yearMonth);
-        console.log("dropping existing billing tables : " + redshiftDropTableSqlString);
+        logger.log(LOG_STREAM_NAME, "dropping existing billing tables : " + redshiftDropTableSqlString);
         return connection.query(redshiftDropTableSqlString).then(function(result) {
-    			console.log(result);
+    			logger.log(LOG_STREAM_NAME, result);
           return sqlStr;
     		}).catch(function(err) {
-          console.log("ignoring error during dropping tables : " + err);
+          logger.log(LOG_STREAM_NAME, "ignoring error during dropping tables : " + err);
           return sqlStr;
         });
       }).then(function(sqlStr) {
         // now run the sql in the redshift
-    		console.log("importing billing data");
+    		logger.log(LOG_STREAM_NAME, "importing billing data");
         return connection.query(sqlStr).then(function(result) {
-    			console.log(result);
+    			logger.log(LOG_STREAM_NAME, result);
           pgp.end();
           return result;
         }).catch(function(err) {
-          console.log(err);
+          logger.log(LOG_STREAM_NAME, err);
           pgp.end();
-          callback(err);
+          return callback(err);
         });
       }).then(function(result) {
         // set this item processed
@@ -92,19 +99,19 @@ exports.handler = (event, context, callback) => {
           Item: itemToProcess
         };
         return documentClient.put(params).promise().then(function(data) {
-          console.log(data);
-          callback(null, true);
+          logger.log(LOG_STREAM_NAME, data);
+          return callback(null, true);
         }).catch(function(err) {
-          console.log(err);
-          callback(err);
+          logger.log(LOG_STREAM_NAME, err);
+          return callback(err);
         });
       }).catch(function(err) {
-        console.log(err);
-        callback(err);
+        logger.log(LOG_STREAM_NAME, err);
+        return callback(err);
       });
     }
   }).catch(function(err) {
-    console.log(err);
-    callback(err);
+    logger.log(LOG_STREAM_NAME, err);
+    return callback(err);
   })
 };
