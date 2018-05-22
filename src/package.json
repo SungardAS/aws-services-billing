@@ -12,10 +12,11 @@
     "aws-sdk": "^2.6.7",
     "aws-services-lib": "https://github.com/SungardAS/aws-services-lib.git#master",
     "dateformat": "^1.0.12",
-    "lawgs": "^1.0.4",
     "node-uuid": "^1.4.7",
     "pg-promise": "^5.3.3",
     "plotly": "^1.0.6",
-    "q": "^1.4.1"
+    "q": "^1.4.1",
+    "winston": "^2.4.2",
+    "winston-aws-cloudwatch": "^2.0.0"
   }
 }
