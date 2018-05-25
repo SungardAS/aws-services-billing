@@ -4,8 +4,9 @@ RUN mkdir /app
 
 WORKDIR /app
 
-RUN git clone https://github.com/SungardAS/aws-services-billing.git
+COPY ./src /app/src
 
-RUN cd aws-services-billing/src && npm install
+RUN cd /app/src && npm install
 
-CMD node /app/aws-services-billing/src/run_import.js
+CMD node /app/src/run_import.js
+
