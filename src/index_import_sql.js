@@ -20,27 +20,51 @@ exports.handler = (event, context, callback) => {
   }
   else {
     console.log("We've got a new billing file, " + key);
-      // get sqls first
-    params = {
-      bucket: bucket,
-      key: key
-    }
-    // save it to a dynamodb table
     var documentClient = new AWS.DynamoDB.DocumentClient({region: region});
     var params = {
-      TableName : sqlTableName,
-      Item: {
-        "id": key,
-        "bucket": bucket,
-        "key": key,
-        "sentAt": (new Date()).toISOString()
-      }
+      TableName: sqlTableName,
+      FilterExpression: 'attribute_not_exists(processedAt)'
     };
-    return documentClient.put(params).promise().then(function(data) {
-			console.log(data);
-      return true;
-		}).catch(function(err) {
-      console.log("ignoring error during saving sql : " + err);
+    return documentClient.scan(params).promise().then(function(data) {
+      if (data.Items.length > 0) {
+        console.log(JSON.stringify(data.Items));
+        console.log("We have unprocessed " + data.Items.length + " sql jobs, so set it 'skip'");
+        var itemToProcess = data.Items[0];
+        itemToProcess['processedAt'] = 'skip';
+        var params = {
+          TableName : sqlTableName,
+          Item: itemToProcess
+        };
+        return documentClient.put(params).promise().then(function(data) {
+          console.log("billing job '" + itemToProcess['key'] + "' has been set to be skipped");
+          return true;
+        }).catch(function(err) {
+          console.log("failed in setting an existing job as 'skip' : " + err);
+          return callback(err);
+        });
+      }
+      else {
+        return true;
+      }
+    }).then(function(data) {
+      var params = {
+        TableName : sqlTableName,
+        Item: {
+          "id": key,
+          "bucket": bucket,
+          "key": key,
+          "sentAt": (new Date()).toISOString()
+        }
+      };
+      return documentClient.put(params).promise().then(function(data) {
+  			console.log("new sql job '" + key + "'has been successfully stored");
+        return true;
+  		}).catch(function(err) {
+        console.log("failed in saving a new sql job: " + err);
+        callback(err);
+      });
+    }).catch(function(err) {
+      console.log("failed in getting existing sql jobs : " + err);
       callback(err);
     });
   }
