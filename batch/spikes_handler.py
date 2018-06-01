@@ -103,7 +103,8 @@ def get_detail_messages(current_date, account_id):
         utc = datetime.datetime.strptime(item["blended"][0]['datetime'], '%Y-%m-%d %H:%M:%S')
         utc = utc.replace(tzinfo=from_zone)
 
-        message = "As of %s, the billing amount of '%s' in Account, '%s(%s)', is $%s" % (utc, item['product_code'], item['account_id'], item['account_name'], item["blended"][0]['charge'])
+        #message = "As of %s, the billing amount of '%s' in Account, '%s(%s)', is $%s" % (utc, item['product_code'], item['account_id'], item['account_name'], item["blended"][0]['charge'])
+        message = "As of %s, the billing amount of '%s' is $%s" % (utc, item['product_code'], item["blended"][0]['charge'])
         if len(item["blended"]) >= 2:
             if item["blended"][1].get('increased'):
                 message += ", which is %.2f%% increase from last month ($%s)" % (decimal.Decimal(item["blended"][1]['increased']), item["blended"][1]['charge'])

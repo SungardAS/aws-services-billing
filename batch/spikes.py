@@ -89,7 +89,7 @@ def draw_bar(account_id, product_code, compared):
 
     #plt.show()
 
-    image_file_path = '%s_%s_%s.png' % (compared['account_id'], compared['product_code'], compared['unblended'][0]['datetime'].replace(' ', 'A').replace(':', ''))
+    image_file_path = 'graphs/%s_%s_%s.png' % (compared['account_id'], compared['product_code'], compared['unblended'][0]['datetime'].replace(' ', 'A').replace(':', ''))
     #print('image file = %s' % image_file_path)
     fig.savefig(image_file_path, dpi=100)
 

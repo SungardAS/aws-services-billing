@@ -86,5 +86,5 @@ print "spikes.py completed"
 
 f.close()
 
-item.spikedAt = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
-sql_table.create(item)
+item['spikedAt'] = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+sql_table.put_item(Item=item)
