@@ -327,6 +327,7 @@ Resources:
                   - "dynamodb:GetItem"
                   - "dynamodb:PutItem"
                   - "dynamodb:Query"
+                  - "dynamodb:Scan"
                 Resource: "*"
               -
                 Effect: "Allow"
