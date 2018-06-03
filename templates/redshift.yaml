@@ -33,7 +33,7 @@ Resources:
       DBName: !Ref RedshiftDatabase
       MasterUsername: !Ref RedshiftUser
       MasterUserPassword: !Ref RedshiftPass
-      NodeType: "dc1.large"
+      NodeType: "ds2.xlarge"
       ClusterType: "single-node"
       PubliclyAccessible: false
       Encrypted: true

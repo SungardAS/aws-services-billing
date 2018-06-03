@@ -67,28 +67,6 @@ Parameters:
   RedshiftSnapshotClusterIdentifier:
     Type: String
     Description: Redshift Cluster Identifier of Source Snapshot. This must be specified if RedshiftSnapshotIdentifier is set.
-  AlarmThresholdNumber:
-    Type: Number
-    Default: 10
-    Description: Threshold Number for Alarms
-  AllowedAverageCost:
-    Type: Number
-    Default: 2
-    Description: Allowed Average Cost
-  PlotlyUsername:
-    Type: String
-    Description: Plotly Username
-  PlotlyAPIKey:
-    Type: String
-    NoEcho: true
-    Description: Plotly API Key
-  BillingLogGroupName:
-    Type: String
-    Default: "/SungardAS/Alerts/Billing"
-    Description: Health Cloudwatch Log Group Name
-  SubscriptionFilterDestinationArn:
-    Type: String
-    Description: Subscription Filter Destination Arn
 Resources:
   Vpc:
     Type: "AWS::CloudFormation::Stack"
@@ -235,14 +213,6 @@ Resources:
             Principal:
               AWS: !GetAtt LambdaFunctionIAMRole.Arn
             Resource: '*'
-          -
-            Sid: "Allow Decryption Service to use this key"
-            Effect: "Allow"
-            Action:
-              - "kms:Decrypt"
-            Principal:
-              AWS: !GetAtt AlertLambdaFunctionIAMRole.Arn
-            Resource: '*'
   SQLTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -336,42 +306,6 @@ Resources:
                   - "logs:CreateLogStream"
                   - "logs:PutLogEvents"
                 Resource: "arn:aws:logs:*:*:*"
-  ApiGatewayApi:
-    Type: AWS::Serverless::Api
-    Properties:
-      DefinitionUri: ../swagger.yaml
-      StageName: Prod
-      Variables:
-        LambdaFunctionName: !Ref ProxyFunction
-  ProxyFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: SungardAS-Billing-Proxy
-      Handler: index.handler
-      Runtime: nodejs4.3
-      CodeUri: ../src
-      Role: !GetAtt LambdaFunctionIAMRole.Arn
-      Timeout: 300
-      VpcConfig:
-        SecurityGroupIds:
-          - !Sub "${SecurityGroups.Outputs.RedshiftSecurityGroupId}"
-        SubnetIds:
-          - !Sub "${PrivateSubnet1.Outputs.SubnetId}"
-          - !Sub "${PrivateSubnet2.Outputs.SubnetId}"
-      Environment:
-        Variables:
-          REDSHIFT_CONNECTION_STRING: !Sub "${RedshiftCluster.Outputs.RedshiftConnectionString}"
-          REDSHIFT_USER: !Ref RedshiftUser
-          REDSHIFT_PASS: !Ref RedshiftPass
-          KMS_REGION: !Ref 'AWS::Region'
-          KMS_KEY_ID: !Ref EncryptionDecryptionKey
-      Events:
-        ProxyApiGreedy:
-          Type: Api
-          Properties:
-            RestApiId: !Ref ApiGatewayApi
-            Path: /{proxy+}
-            Method: ANY
   ImportSQLFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -423,230 +357,13 @@ Resources:
           SQL_TABLE_NAME: !Ref SQLTable
   Bucket:
     Type: AWS::S3::Bucket
-  MetricsLambdaFunctionIAMRole:
-    Type: "AWS::IAM::Role"
-    Properties:
-      Path: "/"
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          -
-            Sid: "AllowLambdaServiceToAssumeRole"
-            Effect: "Allow"
-            Action:
-              - "sts:AssumeRole"
-            Principal:
-              Service:
-                - "lambda.amazonaws.com"
-      Policies:
-        -
-          PolicyName: "InlinePolicy"
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              -
-                Effect: "Allow"
-                Action:
-                  - "cloudwatch:*"
-                  - "ec2:*"
-                  - "kms:*"
-                Resource: "*"
-              -
-                Effect: "Allow"
-                Action:
-                  - "sns:Publish"
-                Resource: "arn:aws:sns:*"
-              -
-                Effect: "Allow"
-                Action:
-                  - "lambda:InvokeFunction"
-                Resource: "*"
-              -
-                Effect: "Allow"
-                Action:
-                  - "logs:CreateLogGroup"
-                  - "logs:CreateLogStream"
-                  - "logs:PutLogEvents"
-                Resource: "arn:aws:logs:*:*:*"
-  EstimatedAlarmsFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: SungardAS-Billing-Estimated-Alarams
-      Handler: index_estimated_alarms.handler
-      Runtime: nodejs4.3
-      CodeUri: ../src
-      Role: !GetAtt MetricsLambdaFunctionIAMRole.Arn
-      Timeout: 300
-      Environment:
-        Variables:
-          TOPIC_ARN_FOR_ALARMS: !Ref EstimatedChargesTopic
-      Events:
-        Scheduler:
-          Type: Schedule
-          Properties:
-            Schedule: rate(6 hours)
-  PercentageMetricsFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: SungardAS-Billing-Percentage-Metrics
-      Handler: index_percentage_metrics.handler
-      Runtime: nodejs4.3
-      CodeUri: ../src
-      Role: !GetAtt MetricsLambdaFunctionIAMRole.Arn
-      Timeout: 300
-      VpcConfig:
-        SecurityGroupIds:
-          - !Sub "${SecurityGroups.Outputs.RedshiftSecurityGroupId}"
-        SubnetIds:
-          - !Sub "${PrivateSubnet1.Outputs.SubnetId}"
-          - !Sub "${PrivateSubnet2.Outputs.SubnetId}"
-      Environment:
-        Variables:
-          REDSHIFT_CONNECTION_STRING: !Sub "${RedshiftCluster.Outputs.RedshiftConnectionString}"
-          REDSHIFT_USER: !Ref RedshiftUser
-          REDSHIFT_PASS: !Ref RedshiftPass
-          KMS_REGION: !Ref 'AWS::Region'
-          KMS_KEY_ID: !Ref EncryptionDecryptionKey
-          THRESHOLD_FOR_ALARMS: !Ref AlarmThresholdNumber
-          TOPIC_ARN_FOR_ALARMS: !Ref OverIncreasedPercentTopic
-      Events:
-        BillingMetricTopic:
-          Type: SNS
-          Properties:
-            Topic: !Ref EstimatedChargesTopic
-  EstimatedChargesTopic:
-    Type: AWS::SNS::Topic
-  AlertLambdaFunctionIAMRole:
-    Type: "AWS::IAM::Role"
-    Properties:
-      Path: "/"
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          -
-            Sid: "AllowLambdaServiceToAssumeRole"
-            Effect: "Allow"
-            Action:
-              - "sts:AssumeRole"
-            Principal:
-              Service:
-                - "lambda.amazonaws.com"
-      Policies:
-        -
-          PolicyName: "InlinePolicy"
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              -
-                Effect: "Allow"
-                Action:
-                  - "cloudwatch:*"
-                  - "ec2:*"
-                  - "s3:*"
-                  - "kms:*"
-                Resource: "*"
-              -
-                Effect: "Allow"
-                Action:
-                  - "sns:Publish"
-                Resource: "arn:aws:sns:*"
-              -
-                Effect: "Allow"
-                Action:
-                  - "cloudwatchlogs:*"
-                Resource: "*"
-              -
-                Effect: "Allow"
-                Action:
-                  - "logs:CreateLogGroup"
-                  - "logs:CreateLogStream"
-                  - "logs:PutLogEvents"
-                Resource: "arn:aws:logs:*:*:*"
-  CloudWatchLogsFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: SungardAS-Billing-CloudwatchLogs
-      Handler: index_cloudwatchlogs.handler
-      Runtime: nodejs4.3
-      CodeUri: ../src
-      Role: !GetAtt AlertLambdaFunctionIAMRole.Arn
-      Timeout: 300
-      VpcConfig:
-        SecurityGroupIds:
-          - !Sub "${SecurityGroups.Outputs.RedshiftSecurityGroupId}"
-        SubnetIds:
-          - !Sub "${PrivateSubnet1.Outputs.SubnetId}"
-          - !Sub "${PrivateSubnet2.Outputs.SubnetId}"
-      Environment:
-        Variables:
-          REDSHIFT_CONNECTION_STRING: !Sub "${RedshiftCluster.Outputs.RedshiftConnectionString}"
-          REDSHIFT_USER: !Ref RedshiftUser
-          REDSHIFT_PASS: !Ref RedshiftPass
-          THRESHOLD_FOR_ALARMS: !Ref AlarmThresholdNumber
-          ALLOWED_AVERAGE_COST: !Ref AllowedAverageCost
-          S3_BUCKET_NAME: !Ref GraphImageBucket
-          PLOTLY_USERNAME: !Ref PlotlyUsername
-          PLOTLY_API_KEY: !Ref PlotlyAPIKey
-          BILLING_LOG_GROUP_NAME: !Ref BillingLogGroupName
-          KMS_REGION: !Ref 'AWS::Region'
-          KMS_KEY_ID: !Ref EncryptionDecryptionKey
-      Events:
-        BillingAlertTopic:
-          Type: SNS
-          Properties:
-            Topic: !Ref OverIncreasedPercentTopic
-  GraphImageBucket:
-    Type: AWS::S3::Bucket
-  OverIncreasedPercentTopic:
-    Type: AWS::SNS::Topic
-  BillingLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Ref BillingLogGroupName
-  SubscriptionFilter:
-    Type: AWS::Logs::SubscriptionFilter
-    DependsOn: BillingLogGroup
-    Properties:
-      LogGroupName: !Ref BillingLogGroupName
-      FilterPattern: ""
-      DestinationArn: !Ref SubscriptionFilterDestinationArn
 Outputs:
-  ApiUrl:
-    Description: URL of your API endpoint
-    Value: !Join
-      - ''
-      - - https://
-        - !Ref ApiGatewayApi
-        - '.execute-api.'
-        - !Ref 'AWS::Region'
-        - '.amazonaws.com/Prod'
-  ProxyLambdaFunctionArn:
-    Description: "Proxy Lambda Function ARN"
-    Value: !GetAtt ProxyFunction.Arn
-  EstimatedAlarmsLambdaFunctionArn:
-    Description: "Lambda Function ARN to Create Estimated Charges Alarams"
-    Value: !GetAtt EstimatedAlarmsFunction.Arn
-  PercentageMetricsLambdaFunctionArn:
-    Description: "Lambda Function ARN to Create Increased Percentages Metrics"
-    Value: !GetAtt PercentageMetricsFunction.Arn
-  CloudWatchLogsLambdaFunctionArn:
-    Description: "CloudWatchLogs Lambda Function ARN"
-    Value: !GetAtt CloudWatchLogsFunction.Arn
   EncryptionDecryptionKeyId:
     Description: "Encryption Decryption KMS Key Id"
     Value: !Ref EncryptionDecryptionKey
-  EstimatedChargesTopicArn:
-    Description: "SNS Topic Arn for EstimatedCharges"
-    Value: !Ref EstimatedChargesTopic
-  OverIncreasedPercentTopicArn:
-    Description: "SNS Topic Arn for Over Increased Percent"
-    Value: !Ref OverIncreasedPercentTopic
   BillingDataUploadBucketName:
     Description: "Billing Data Upload Bucket Name"
     Value: !Ref Bucket
   BucketServiceIAMRoleNameForRedshift:
     Description: "Name of IAM Role that permits Redshift to access S3 Bucket"
     Value: !Ref BucketServiceIAMRole
-  GraphImageBucketBucketName:
-    Description: "Graph Image Bucket Bucket Name"
-    Value: !Ref GraphImageBucket
