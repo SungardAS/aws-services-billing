@@ -99,7 +99,7 @@ Resources:
         Memory: 2000
         Command:
           - node
-          - /app/aws-services-billing/src/run_import.js
+          - /app/run_import.js
         Environment:
           - Name: BUCKET_IAM_ROLE_ARN
             Value: !Ref BucketIamRoleArn
