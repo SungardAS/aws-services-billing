@@ -463,6 +463,10 @@ Resources:
                       - !Ref RedshiftSnapshotIdentifier
                       - '", "RedshiftSnapshotClusterIdentifier":"'
                       - !Ref RedshiftSnapshotClusterIdentifier
+                      - '", "ContainterImageRepoName": "'
+                      - !Ref ContainterImageRepoName
+                      - '", "ContainterImageTag":"'
+                      - !Ref ContainterImageTag
                       - '"}'
                 TemplatePath: MyAppBuild::samTemplate.yaml
               RunOrder: 1
