@@ -164,6 +164,19 @@ Resources:
         RedshiftSecurityGroupId: !Sub "${SecurityGroups.Outputs.RedshiftSecurityGroupId}"
         RedshiftSnapshotIdentifier: !Ref RedshiftSnapshotIdentifier
         RedshiftSnapshotClusterIdentifier: !Ref RedshiftSnapshotClusterIdentifier
+  Batch:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL: "./batch.yaml"
+      Parameters:
+        BucketIamRoleArn: !GetAtt BucketServiceIAMRole
+        RedshiftUser: !Ref RedshiftUser
+        RedshiftPass: !Ref RedshiftPass
+        SQLTableName: !Ref SQLTable
+        RedshiftConnectionString: !Sub "${RedshiftCluster.Outputs.RedshiftConnectionString}"
+        SubnetId: !Sub "${PrivateSubnet2.Outputs.SubnetId}"
+        SecurityGroupId: !Sub "${SecurityGroups.Outputs.RedshiftSecurityGroupId}"
+        EcsInstanceRoleId:
   BucketServiceIAMRole:
     Type: "AWS::IAM::Role"
     Properties:
@@ -181,38 +194,6 @@ Resources:
             Principal:
               Service:
                 - "redshift.amazonaws.com"
-  EncryptionDecryptionKey:
-    Type: AWS::KMS::Key
-    Properties:
-      Description: "Encryption and Decryption key for Lambda"
-      KeyPolicy:
-        Id: "LambdaEncDec"
-        Version: "2012-10-17"
-        Statement:
-          -
-            Sid: "Allow administration of the key"
-            Effect: "Allow"
-            Action:
-              - "kms:*"
-            Principal:
-              AWS: !Ref AWS::AccountId
-            Resource: '*'
-          -
-            Sid: "Allow Encryption Service to use this key"
-            Effect: "Allow"
-            Action:
-              - "kms:Encrypt"
-            Principal:
-              AWS: !GetAtt LambdaFunctionIAMRole.Arn
-            Resource: '*'
-          -
-            Sid: "Allow Decryption Service to use this key"
-            Effect: "Allow"
-            Action:
-              - "kms:Decrypt"
-            Principal:
-              AWS: !GetAtt LambdaFunctionIAMRole.Arn
-            Resource: '*'
   SQLTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -228,43 +209,6 @@ Resources:
       ProvisionedThroughput:
         ReadCapacityUnits: 5
         WriteCapacityUnits: 5
-  LambdaFunctionIAMRole:
-    Type: "AWS::IAM::Role"
-    Properties:
-      Path: "/"
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          -
-            Sid: "AllowLambdaServiceToAssumeRole"
-            Effect: "Allow"
-            Action:
-              - "sts:AssumeRole"
-            Principal:
-              Service:
-                - "lambda.amazonaws.com"
-      Policies:
-        -
-          PolicyName: "InlinePolicy"
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              -
-                Effect: "Allow"
-                Action:
-                  - "iam:*"
-                  - "kms:*"
-                  - "s3:*"
-                  - "sts:*"
-                  - "ec2:*"
-                Resource: "*"
-              -
-                Effect: "Allow"
-                Action:
-                  - "logs:CreateLogGroup"
-                  - "logs:CreateLogStream"
-                  - "logs:PutLogEvents"
-                Resource: "arn:aws:logs:*:*:*"
   SQLLambdaFunctionIAMRole:
     Type: "AWS::IAM::Role"
     Properties:
@@ -330,37 +274,9 @@ Resources:
           Properties:
             Bucket: !Ref Bucket
             Events: s3:ObjectCreated:*
-  ImportFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: SungardAS-Billing-Import
-      Handler: index_import.handler
-      Runtime: nodejs6.10
-      CodeUri: ../src
-      Role: !GetAtt LambdaFunctionIAMRole.Arn
-      Timeout: 300
-      VpcConfig:
-        SecurityGroupIds:
-          - !Sub "${SecurityGroups.Outputs.RedshiftSecurityGroupId}"
-        SubnetIds:
-          - !Sub "${PrivateSubnet1.Outputs.SubnetId}"
-          - !Sub "${PrivateSubnet2.Outputs.SubnetId}"
-      Environment:
-        Variables:
-          BUCKET_IAM_ROLE_ARN: !GetAtt BucketServiceIAMRole.Arn
-          BUCKET_REGION: !Ref 'AWS::Region'
-          REDSHIFT_CONNECTION_STRING: !Sub "${RedshiftCluster.Outputs.RedshiftConnectionString}"
-          REDSHIFT_USER: !Ref RedshiftUser
-          REDSHIFT_PASS: !Ref RedshiftPass
-          KMS_REGION: !Ref 'AWS::Region'
-          KMS_KEY_ID: !Ref EncryptionDecryptionKey
-          SQL_TABLE_NAME: !Ref SQLTable
   Bucket:
     Type: AWS::S3::Bucket
 Outputs:
-  EncryptionDecryptionKeyId:
-    Description: "Encryption Decryption KMS Key Id"
-    Value: !Ref EncryptionDecryptionKey
   BillingDataUploadBucketName:
     Description: "Billing Data Upload Bucket Name"
     Value: !Ref Bucket

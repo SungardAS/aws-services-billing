@@ -2,13 +2,13 @@
 
 let AWS = require('aws-sdk');
 let pgp = require('pg-promise')();
-let kms = require('aws-services-lib/aws_promise/kms');
+//let kms = require('aws-services-lib/aws_promise/kms');
 var logger = require('./logger')
 
 exports.handler = (event, context, callback) => {
 
   let region = process.env.AWS_DEFAULT_REGION;
-  let kmsRegion = process.env.BUCKET_REGION;
+  //let kmsRegion = process.env.BUCKET_REGION;
   let bucketIAMRoleArn = process.env.BUCKET_IAM_ROLE_ARN;
   let bucketRegion = process.env.BUCKET_REGION;
   let sqlTableName = process.env.SQL_TABLE_NAME;
@@ -36,29 +36,29 @@ exports.handler = (event, context, callback) => {
       var itemToProcess = data.Items[0];
       var yearMonth = tokens[2].split('-')[0].substring(0, 6);
       var connection = null;
-      var params = {
+      /*var params = {
         region: kmsRegion,
         password: redshiftPass
       };
       return kms.decrypt(params).then(function(data) {
-        redshiftPass = data.Plaintext.toString();
+        redshiftPass = data.Plaintext.toString();*/
         redshiftConnectionString = 'pg:' + redshiftUser + ':' + redshiftPass + '@' + redshiftConnectionString;
-      }).then(function() {
-        // get sqls first
-        var s3 = new AWS.S3({region: region});
-        params = {
-          Bucket: data.Items[0].bucket,
-          Key: data.Items[0].key
-        }
-        return s3.getObject(params).promise().then(function(data) {
-          //logger.log("info", data.Body.toString());
-          var sqlStr = data.Body.toString().replace('<AWS_ROLE>', bucketIAMRoleArn).replace("<S3_BUCKET_REGION>", "'" + bucketRegion + "'");
-          logger.log("info", sqlStr);
-          return sqlStr;
-        }).catch(function(err) {
-          logger.log("info", err);
-          return callback(err);
-        });
+      /*}).then(function() {*/
+      // get sqls first
+      var s3 = new AWS.S3({region: region});
+      params = {
+        Bucket: data.Items[0].bucket,
+        Key: data.Items[0].key
+      }
+      return s3.getObject(params).promise().then(function(data) {
+        //logger.log("info", data.Body.toString());
+        var sqlStr = data.Body.toString().replace('<AWS_ROLE>', bucketIAMRoleArn).replace("<S3_BUCKET_REGION>", "'" + bucketRegion + "'");
+        logger.log("info", sqlStr);
+        return sqlStr;
+      /*}).catch(function(err) {
+        logger.log("info", err);
+        return callback(err);
+      });*/
       }).then(function(sqlStr) {
         // get the connection to redshit
         connection = pgp(redshiftConnectionString);

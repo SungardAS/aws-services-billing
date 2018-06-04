@@ -1,0 +1,138 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: AWS CloudFormation Template Managed Single Batch Job Queue
+Parameters:
+  BucketIamRoleArn:
+    Type: String
+  RedshiftUser:
+    Type: String
+  RedshiftPass:
+    Type: String
+  SQLTableName:
+    Type: String
+  RedshiftConnectionString:
+    Type: String
+  SubnetId:
+    Type: String
+  SecurityGroupId:
+    Type: String
+Resources:
+  Bucket:
+    Type: AWS::S3::Bucket
+  BatchServiceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: batch.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole'
+  IamInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Roles:
+        - !Ref EcsInstanceRoleId
+  EcsInstanceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2008-10-17
+        Statement:
+          - Sid: ''
+            Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role
+        - arn:aws:iam::aws:policy/AmazonSageMakerFullAccess
+      Policies:
+        -
+          PolicyName: "InlinePolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action:
+                  - "organizations:DescribeAccount"
+                Resource: "*"
+              -
+                Effect: "Allow"
+                Action:
+                  - "s3:GetObject"
+                  - "s3:PutObject"
+                  - "s3:DeleteObject"
+                  - "s3:ListBucket"
+                Resource: "*"
+              -
+                Effect: "Allow"
+                Action:
+                  - "ecr:InitiateLayerUpload",
+                  - "ecr:UploadLayerPart",
+                  - "ecr:CompleteLayerUpload",
+                  - "ecr:PutImage"
+                Resource: "arn:aws:ecr:us-east-1:054649790173:repository/sungardas/*"
+  JobDefinition:
+    Type: 'AWS::Batch::JobDefinition'
+    Properties:
+      Type: container
+      JobDefinitionName: "billing-data-import-to-redshift-job"
+      Parameters:
+        - BUCKET_IAM_ROLE_ARN: !Ref BucketIamRoleArn
+        - REDSHIFT_USER: !Ref RedshiftUser
+        - REDSHIFT_PASS: !Ref RedshiftPass
+        - AWS_DEFAULT_REGION: !Ref 'AWS::Region'
+        - BUCKET_REGION: !Ref 'AWS::Region'
+        - SQL_TABLE_NAME: !Ref SQLTableName
+        - REDSHIFT_CONNECTION_STRING: !Ref RedshiftConnectionString
+      ContainerProperties:
+        Image: !Join
+          - ''
+          - - 054649790173.dkr.ecr.
+            - !Ref 'AWS::Region'
+            - '.amazonaws.com/sungardas/billing_import:latest'
+        Vcpus: 1
+        Memory: 2000
+        Command:
+          - node
+          - /app/aws-services-billing/src/run_import.js
+      RetryStrategy:
+        Attempts: 1
+  JobQueue:
+    Type: 'AWS::Batch::JobQueue'
+    Properties:
+      JobQueueName: "billing-data-import-to-redshift-queue"
+      Priority: 6
+      ComputeEnvironmentOrder:
+        - Order: 1
+          ComputeEnvironment: !Ref ComputeEnvironment
+  ComputeEnvironment:
+    Type: 'AWS::Batch::ComputeEnvironment'
+    Properties:
+      Type: MANAGED
+      ComputeEnvironmentName: "billing-data-import-to-redshift-env"
+      ComputeResources:
+        Type: EC2
+        MinvCpus: 0
+        DesiredvCpus: 0
+        MaxvCpus: 64
+        InstanceTypes:
+          - optimal
+        Subnets:
+          - !Ref SubnetId
+        SecurityGroupIds:
+          - !Ref SecurityGroupId
+        InstanceRole: !Ref IamInstanceProfile
+      ServiceRole: !Ref BatchServiceRole
+Outputs:
+  ComputeEnvironmentArn:
+    Value: !Ref ComputeEnvironment
+  JobQueueArn:
+    Value: !Ref JobQueue
+  JobDefinitionArn:
+    Value: !Ref JobDefinition
