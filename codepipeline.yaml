@@ -17,10 +17,15 @@ Parameters:
     Type: String
     NoEcho: true
     Description: Personal Access Token to Access GitHub Repository
-  ProjectImage:
+  ProjectImageForContainer:
     Type: String
     AllowedValues:
       - "aws/codebuild/docker:17.09.0"
+    Description: Implemented Programming Language
+  ProjectImage:
+    Type: String
+    AllowedValues:
+      - "aws/codebuild/nodejs:6.3.1"
     Description: Implemented Programming Language
   ContainterImageRepoName:
     Type: String
@@ -166,7 +171,7 @@ Resources:
           - - !Ref GitHubSourceRepositoryOwner
             - !Ref GitHubSourceRepositoryName
             - "codebuild"
-      Description: CodeBuild for a Project aws-services-alerts
+      Description: CodeBuild for Lambda functions in Project aws-services-billing
       ServiceRole: !GetAtt CodeBuildServiceRole.Arn
       Artifacts:
         Type: CODEPIPELINE
@@ -181,12 +186,39 @@ Resources:
           Value: !Ref AWS::Region
         - Name: AWS_ACCOUNT_ID
           Value: !Ref AWS::AccountId
+      Source:
+        Type: CODEPIPELINE
+      TimeoutInMinutes: 60
+  CodeBuildProjectForContainer:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Join
+          - '-'
+          - - !Ref GitHubSourceRepositoryOwner
+            - !Ref GitHubSourceRepositoryName
+            - "codebuild_container"
+      Description: CodeBuild for containers in Project aws-services-billing
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: !Ref ProjectImageForContainer
+        EnvironmentVariables:
+        - Name: S3_BUCKET_NAME
+          Value: !Ref InputArtifactS3Bucket
+        - Name: AWS_DEFAULT_REGION
+          Value: !Ref AWS::Region
+        - Name: AWS_ACCOUNT_ID
+          Value: !Ref AWS::AccountId
         - Name: IMAGE_REPO_NAME
           Value: !Ref ContainterImageRepoName
         - Name: IMAGE_TAG
           Value: !Ref ContainterImageTag
       Source:
         Type: CODEPIPELINE
+        BuildSpec: buildspec_container.yml
       TimeoutInMinutes: 60
   InputArtifactS3Bucket:
     Type: "AWS::S3::Bucket"
@@ -371,6 +403,22 @@ Resources:
               Configuration:
                 ProjectName: !Ref CodeBuildProject
               RunOrder: 1
+            -
+              Name: CodeBuild_Container
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              InputArtifacts:
+                -
+                  Name: MyApp
+              OutputArtifacts:
+                -
+                  Name: MyAppBuild_Container
+              Configuration:
+                ProjectName: !Ref CodeBuildProjectForContainer
+              RunOrder: 2
         -
           Name: Deploy
           Actions:
@@ -473,8 +521,11 @@ Outputs:
     Description: S3 Bucket Name to Store Artifacts
     Value: !Ref InputArtifactS3Bucket
   CodeBuildProjectName:
-    Description: Created CodeBuild Project Name
+    Description: Created CodeBuild Project Name for Lambda
     Value: !Ref CodeBuildProject
+  CodeBuildProjectNameForContainer:
+    Description: Created CodeBuild Project Name for Container
+    Value: !Ref CodeBuildProjectForContainer
   CodePipelineProjectName:
     Description: Created CodePipeline Project Name
     Value: !Ref CodePipeline
