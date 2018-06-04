@@ -290,3 +290,5 @@ Outputs:
   BucketServiceIAMRoleNameForRedshift:
     Description: "Name of IAM Role that permits Redshift to access S3 Bucket"
     Value: !Ref BucketServiceIAMRole
+  EcsInstanceRole:
+    Value: !Sub "${Batch.Outputs.EcsInstanceRole}"

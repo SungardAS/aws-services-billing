@@ -150,3 +150,5 @@ Outputs:
     Value: !Ref JobQueue
   JobDefinitionArn:
     Value: !Ref JobDefinition
+  EcsInstanceRole:
+    Value: !Ref EcsInstanceRole

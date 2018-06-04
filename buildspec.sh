@@ -27,6 +27,8 @@ aws cloudformation deploy --template-file ./samTemplate.yaml \
   --parameter-overrides RedshiftUser=$REDSHIFT_USER RedshiftPass=$REDSHIFT_PASS \
   RedshiftDatabase=$REDSHIFT_DATABASE VpcCidr=$VPC_CIDR PublicCidr1=$PUBLIC_CIDR_1 PublicCidr2=$PUBLIC_CIDR_2 \
   PrivateCidr1=$PRIVATE_CIDR_1 PrivateCidr2=$PRIVATE_CIDR_2 NameTag=$NAME_TAG \
-  RedshiftSnapshotIdentifier=$REDSHIFT_SNAPSHOT_IDENTIFIER  RedshiftSnapshotClusterIdentifier=$REDSHIFT_SNAPSHOT_CLUSTER_IDENTIFIER
+  RedshiftSnapshotIdentifier=$REDSHIFT_SNAPSHOT_IDENTIFIER  RedshiftSnapshotClusterIdentifier=$REDSHIFT_SNAPSHOT_CLUSTER_IDENTIFIER \
+  ContainterImageRepoName=$CONTAINER_IMAGE_REPO_NAME ContainterImageTag=$CONTAINER_IMAGE_TAG
+
 
 rm samTemplate.yaml
