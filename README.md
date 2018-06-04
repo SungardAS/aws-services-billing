@@ -1,7 +1,5 @@
 
-# Billing Dashboard & Alert System
-
-Billing Dashboard Service to Provide Billing API Interfaces and Generate Billing Alert For Over Charges.
+# Billing Data Import System
 
 This creates a Redshift cluster where Billing report data is exported whenever the report is created.
 
@@ -12,22 +10,6 @@ This creates a Redshift cluster where Billing report data is exported whenever t
 <a href="https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/new?stackName=ServerlessCodePipeline&amp;templateURL=https://s3.amazonaws.com/cloudformation-serverless-codepipeline.us-east-1/codepipeline.yaml"><img src="https://camo.githubusercontent.com/210bb3bfeebe0dd2b4db57ef83837273e1a51891/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f636c6f7564666f726d6174696f6e2d6578616d706c65732f636c6f7564666f726d6174696f6e2d6c61756e63682d737461636b2e706e67" alt="Launch Stack" data-canonical-src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png" /></a>
 
 Input Parameter Values
-
-- CloudformationLambdaExecutionRoleArn:
-
-  Enter `ARN of IAM Role for Cloudformation to create changesets and target stack`. If you already created one or more CodePipeline that uses Cloudformation, this role should have been created already, so you can use the same role, 'cloudformation-lambda-execution-role'. If not, please create a role with the same name with Trust Relationships and Policy Document defined <a href="https://s3.amazonaws.com/cloudformation-serverless-codepipeline.us-east-1/roles/role_cloudformation-lambda-execution-role.json">here</a>.
-
-- CodePipelineServiceRoleArn:
-
-  Enter `ARN of IAM Role for CodePipeline to be executed`. If you already created one or more CodePipeline, this role should have been created already, so you can use the same role, 'AWS-CodePipeline-Service'. If not, please create a role with the same name with Trust Relationships and Policy Document defined <a href="https://s3.amazonaws.com/cloudformation-serverless-codepipeline.us-east-1/roles/role_AWS-CodePipeline-Service.json">here</a>.
-
-- CustomAuthorizerIAMRoleName:
-
-  Enter the `NAME (not ARN) of IAM Role that has the permission for API Gateway to invoke custom authorizer Lambda Function`. (See <a href="https://s3.amazonaws.com/cloudformation-serverless-codepipeline.us-east-1/roles/role_apigateway-lambda-execution-role.json">here</a> for Trust Relationships and Policy Document).
-
-- CustomAuthorizerLambdaName:
-
-  Enter the `NAME (not ARN) of custom authorizer Lambda Function`. (See <a href="https://github.com/SungardAS/aws-services-authorizer">here</a> for the Lambda Function Project for Custom Authorizer using SSO Server).
 
 - EncryptionLambdaName:
 
@@ -43,9 +25,49 @@ Input Parameter Values
 
 - GitHubSourceRepositoryOwner: `SungardAS`
 
-- ParameterOverrides: `{ "VPCCidrBlock": "ip_range", "SubnetCidrBlock1": "ip_range", "SubnetCidrBlock2": "ip_range", "NameTag": "redshift", "RedshiftUser": "redshift_user", "RedshiftPass": "redshift_pass", "RedshiftDatabase": "redshift_db", "RedshiftSnapshotIdentifier": "snapshot_id_to_restore_from", "RedshiftSnapshotClusterIdentifier": "cluster_of_source_snapshot", "AlarmThresholdNumber": "10", "AllowedAverageCost": "2", "PlotlyUsername": "plotly_user_name", "PlotlyAPIKey": "plotly_api_key", "SlackWebHookUrl": "slack_web_hook_url", "SlackChannel": "slack_channel" }`
+- NameTag: `billing`
 
-- ProjectImage: `aws/codebuild/nodejs:4.3.2`
+- PrivateCidr1:
+
+  First Private Cidr Block. Format: x.x.x.x/x
+
+- PrivateCidr2:
+
+  Second Private Cidr Block. Format: x.x.x.x/x
+
+- ProjectImage: `aws/codebuild/nodejs:6.3.1`
+
+- PublicCidr1:
+
+  First Public Cidr Block. Format: x.x.x.x/x
+
+- PublicCidr2:
+
+  Second Public Cidr Block. Format: x.x.x.x/x
+
+- RedshiftDatabase:
+
+  Database Name for Redshift Cluster.
+
+- RedshiftPass:
+
+  Password for Redshift Cluster. Password should be at least 8 characters long.
+
+- RedshiftSnapshotClusterIdentifier:
+
+  Redshift Cluster Identifier of Source Snapshot. This must be specified if RedshiftSnapshotIdentifier is set.
+
+- RedshiftSnapshotIdentifier:
+
+  Identifier of Redshift Snapshot for Restoration.
+
+- RedshiftUser:
+
+  User Name for Redshift Cluster
+
+- VpcCidr:
+
+  VPC Cidr Block. Format: x.x.x.x/x
 
 ## How to Setup a Billing Report to Upload Billing Data to S3 Bucket & Redshift
 
@@ -57,47 +79,6 @@ Follow steps in <a href="https://aws.amazon.com/blogs/aws/new-upload-aws-cost-us
   - Choose 'BucketServiceIAMRoleNameForRedshift' value in the Output of the newly created this project stack during "Manage IAM Roles"
 
 Once the billing report is created in the S3 bucket, the billing data will be automatically imported to the Redshift.
-
-## How To Send Requests To API
-
-- Find the API url from the 'Output' tab of the "SungardAS-aws-services-billing" stack in the Cloudformation console
-
-### To get the charge differences for all accounts
-```
-path: /billing
-method : GET
-headers: {
-  "Authorization": <refresh_token_from_SSO_server>
-}
-```
-
-### To get the charge differences for all services in a specific account
-```
-path: /billing?account=<<account_id>>
-method : GET
-headers: {
-  "Authorization": <refresh_token_from_SSO_server>
-}
-```
-
-### To run a specific SQL against the Redshift database
-```
-path: /sql
-method : POST
-headers: {
-  "Authorization": <refresh_token_from_SSO_server>
-}
-data:
-{
-  "sql": "<<SQL>>"
-}
-```
-
-## How To Test Lambda Functions
-
-- $ cd tests
-- Export necessary environment variables and fill the necessary input values
-- $ node test_xxx.js
 
 ## [![Sungard Availability Services | Labs][labs-logo]][labs-github-url]
 
