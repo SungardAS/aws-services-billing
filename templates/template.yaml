@@ -311,7 +311,7 @@ Resources:
     Properties:
       FunctionName: SungardAS-Billing-Import-SQL
       Handler: index_import_sql.handler
-      Runtime: nodejs4.3
+      Runtime: nodejs6.10
       CodeUri: ../src
       Role: !GetAtt SQLLambdaFunctionIAMRole.Arn
       Timeout: 300
@@ -335,7 +335,7 @@ Resources:
     Properties:
       FunctionName: SungardAS-Billing-Import
       Handler: index_import.handler
-      Runtime: nodejs4.3
+      Runtime: nodejs6.10
       CodeUri: ../src
       Role: !GetAtt LambdaFunctionIAMRole.Arn
       Timeout: 300
