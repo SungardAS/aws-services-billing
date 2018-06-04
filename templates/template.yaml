@@ -67,6 +67,12 @@ Parameters:
   RedshiftSnapshotClusterIdentifier:
     Type: String
     Description: Redshift Cluster Identifier of Source Snapshot. This must be specified if RedshiftSnapshotIdentifier is set.
+  ContainterImageRepoName:
+    Type: String
+    Default: sungardas/billing_import
+  ContainterImageTag:
+    Type: String
+    Default: latest
 Resources:
   Vpc:
     Type: "AWS::CloudFormation::Stack"
@@ -176,6 +182,8 @@ Resources:
         RedshiftConnectionString: !Sub "${RedshiftCluster.Outputs.RedshiftConnectionString}"
         SubnetId: !Sub "${PrivateSubnet2.Outputs.SubnetId}"
         SecurityGroupId: !Sub "${SecurityGroups.Outputs.RedshiftSecurityGroupId}"
+        ContainterImageRepoName: !Ref ContainterImageRepoName
+        ContainterImageTag: !Ref ContainterImageTag
   BucketServiceIAMRole:
     Type: "AWS::IAM::Role"
     Properties:

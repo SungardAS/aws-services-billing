@@ -33,10 +33,6 @@ Parameters:
   ContainterImageTag:
     Type: String
     Default: latest
-  EncryptionLambdaName:
-    Type: String
-    Default: ""
-    Description: Encryption Lambda Function Name when This Project Lambda Function has Secret Environment Variables to be Encrypted
   VpcCidr:
     Type: String
     Default: "10.10.0.0/16"
@@ -103,8 +99,6 @@ Parameters:
   RedshiftSnapshotClusterIdentifier:
     Type: String
     Description: Redshift Cluster Identifier of Source Snapshot. This must be specified if RedshiftSnapshotIdentifier is set.
-Conditions:
-  HasEncryptionLambda: !Not [!Equals [!Ref EncryptionLambdaName, ""]]
 Resources:
   CodeBuildServiceRole:
       Type: "AWS::IAM::Role"
@@ -418,7 +412,7 @@ Resources:
                   Name: MyAppBuild_Container
               Configuration:
                 ProjectName: !Ref CodeBuildProjectForContainer
-              RunOrder: 2
+              RunOrder: 1
         -
           Name: Deploy
           Actions:
@@ -491,27 +485,6 @@ Resources:
                       - !Ref GitHubSourceRepositoryName
                       - "changeset"
               RunOrder: 2
-            -
-              !If
-                - HasEncryptionLambda
-                -
-                  Name: EncryptLambdaSecretEnvVars
-                  ActionTypeId:
-                    Category: Invoke
-                    Owner: AWS
-                    Version: 1
-                    Provider: Lambda
-                  Configuration:
-                    FunctionName: !Ref EncryptionLambdaName
-                    UserParameters: !Join
-                        - ''
-                        - - "{\"stack_name\":\""
-                          - !Ref GitHubSourceRepositoryOwner
-                          - "-"
-                          - !Ref GitHubSourceRepositoryName
-                          - "\"}"
-                  RunOrder: 3
-                - !Ref "AWS::NoValue"
       ArtifactStore:
         Type: S3
         Location: !Ref InputArtifactS3Bucket

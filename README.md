@@ -15,10 +15,6 @@ Input Parameter Values
 
 - ContainterImageTag: `latest`
 
-- EncryptionLambdaName:
-
-  Enter the `NAME (not ARN) of the encryption Lambda Function`. If you didn't already deployed the Encryption Lambda Function, see <a href="https://github.com/SungardAS/aws-services-encryption">here</a> to deploy the Lambda Function to Encrypt Environment Variables.
-
 - GitHubPersonalAccessToken:
 
   `Access Token` for CodeBuild to access to the this Github repository. (See <a href="https://help.github.com/articles/creating-an-access-token-for-command-line-use/">here</a> to find how to generate the access token).
@@ -39,7 +35,9 @@ Input Parameter Values
 
   Second Private Cidr Block. Format: x.x.x.x/x
 
-- ProjectImage: `aws/codebuild/docker:17.09.0`
+- ProjectImage: `aws/codebuild/nodejs:6.3.1`
+
+- ProjectImageForContainer: `aws/codebuild/docker:17.09.0`
 
 - PublicCidr1:
 

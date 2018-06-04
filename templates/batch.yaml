@@ -15,6 +15,12 @@ Parameters:
     Type: String
   SecurityGroupId:
     Type: String
+  ContainterImageRepoName:
+    Type: String
+    Default: sungardas/billing_import
+  ContainterImageTag:
+    Type: String
+    Default: latest
 Resources:
   BatchServiceRole:
     Type: 'AWS::IAM::Role'
@@ -80,25 +86,35 @@ Resources:
     Properties:
       Type: container
       JobDefinitionName: "billing-data-import-to-redshift-job"
-      Parameters:
-        BUCKET_IAM_ROLE_ARN: !Ref BucketIamRoleArn
-        REDSHIFT_USER: !Ref RedshiftUser
-        REDSHIFT_PASS: !Ref RedshiftPass
-        AWS_DEFAULT_REGION: !Ref 'AWS::Region'
-        BUCKET_REGION: !Ref 'AWS::Region'
-        SQL_TABLE_NAME: !Ref SQLTableName
-        REDSHIFT_CONNECTION_STRING: !Ref RedshiftConnectionString
       ContainerProperties:
         Image: !Join
           - ''
           - - 054649790173.dkr.ecr.
             - !Ref 'AWS::Region'
-            - '.amazonaws.com/sungardas/billing_import:latest'
+            - '.amazonaws.com/'
+            - !Ref ContainterImageRepoName
+            - ':'
+            - !Ref ContainterImageTag
         Vcpus: 1
         Memory: 2000
         Command:
           - node
           - /app/aws-services-billing/src/run_import.js
+        Environment:
+          - Name: BUCKET_IAM_ROLE_ARN
+            Value: !Ref BucketIamRoleArn
+          - Name: REDSHIFT_USER
+            Value: !Ref RedshiftUser
+          - Name: REDSHIFT_PASS
+            Value: !Ref RedshiftPass
+          - Name: AWS_DEFAULT_REGION
+            Value: !Ref 'AWS::Region'
+          - Name: BUCKET_REGION
+            Value: !Ref 'AWS::Region'
+          - Name: SQL_TABLE_NAME
+            Value: !Ref SQLTableName
+          - Name: REDSHIFT_CONNECTION_STRING
+            Value: !Ref RedshiftConnectionString
       RetryStrategy:
         Attempts: 1
   JobQueue:
