@@ -3,6 +3,18 @@ source .env.local
 
 cd src; npm install; cd ..
 
+echo Logging in to Amazon ECR...
+$(aws ecr get-login --no-include-email --region $AWS_DEFAULT_REGION)
+
+echo Build container
+cd src; docker build -t $IMAGE_REPO_NAME:$IMAGE_TAG .; cd ..
+docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
+
+echo Build completed on `date`
+echo Pushing the Docker image...
+docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
+
+
 aws cloudformation package \
    --template-file ./templates/template.yaml \
    --s3-bucket $S3_BUCKET_NAME \

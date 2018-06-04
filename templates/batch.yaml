@@ -16,8 +16,6 @@ Parameters:
   SecurityGroupId:
     Type: String
 Resources:
-  Bucket:
-    Type: AWS::S3::Bucket
   BatchServiceRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -34,7 +32,7 @@ Resources:
     Type: 'AWS::IAM::InstanceProfile'
     Properties:
       Roles:
-        - !Ref EcsInstanceRoleId
+        - !Ref EcsInstanceRole
   EcsInstanceRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -83,13 +81,13 @@ Resources:
       Type: container
       JobDefinitionName: "billing-data-import-to-redshift-job"
       Parameters:
-        - BUCKET_IAM_ROLE_ARN: !Ref BucketIamRoleArn
-        - REDSHIFT_USER: !Ref RedshiftUser
-        - REDSHIFT_PASS: !Ref RedshiftPass
-        - AWS_DEFAULT_REGION: !Ref 'AWS::Region'
-        - BUCKET_REGION: !Ref 'AWS::Region'
-        - SQL_TABLE_NAME: !Ref SQLTableName
-        - REDSHIFT_CONNECTION_STRING: !Ref RedshiftConnectionString
+        BUCKET_IAM_ROLE_ARN: !Ref BucketIamRoleArn
+        REDSHIFT_USER: !Ref RedshiftUser
+        REDSHIFT_PASS: !Ref RedshiftPass
+        AWS_DEFAULT_REGION: !Ref 'AWS::Region'
+        BUCKET_REGION: !Ref 'AWS::Region'
+        SQL_TABLE_NAME: !Ref SQLTableName
+        REDSHIFT_CONNECTION_STRING: !Ref RedshiftConnectionString
       ContainerProperties:
         Image: !Join
           - ''
@@ -107,7 +105,7 @@ Resources:
     Type: 'AWS::Batch::JobQueue'
     Properties:
       JobQueueName: "billing-data-import-to-redshift-queue"
-      Priority: 6
+      Priority: 10
       ComputeEnvironmentOrder:
         - Order: 1
           ComputeEnvironment: !Ref ComputeEnvironment

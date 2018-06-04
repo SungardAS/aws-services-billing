@@ -20,16 +20,14 @@ Parameters:
   ProjectImage:
     Type: String
     AllowedValues:
-      - "aws/codebuild/python:2.7.12"
-      - "aws/codebuild/python:3.3.6"
-      - "aws/codebuild/python:3.4.5"
-      - "aws/codebuild/python:3.5.2"
-      - "aws/codebuild/nodejs:4.3.2"
-      - "aws/codebuild/nodejs:4.4.7"
-      - "aws/codebuild/nodejs:5.12.0"
-      - "aws/codebuild/nodejs:6.3.1"
-      - "aws/codebuild/nodejs:7.0.0"
+      - "aws/codebuild/docker:17.09.0"
     Description: Implemented Programming Language
+  ContainterImageRepoName:
+    Type: String
+    Default: sungardas/billing_import
+  ContainterImageTag:
+    Type: String
+    Default: latest
   EncryptionLambdaName:
     Type: String
     Default: ""
@@ -150,6 +148,16 @@ Resources:
                         - - "arn:aws:s3:::"
                           - !Ref InputArtifactS3Bucket
                           - "/*"
+                  -
+                    Effect: "Allow"
+                    Action:
+                      - "ecr:BatchCheckLayerAvailability"
+                      - "ecr:CompleteLayerUpload"
+                      - "ecr:GetAuthorizationToken"
+                      - "ecr:InitiateLayerUpload"
+                      - "ecr:PutImage"
+                      - "ecr:UploadLayerPart"
+                    Resource: "*"
   CodeBuildProject:
     Type: AWS::CodeBuild::Project
     Properties:
@@ -173,6 +181,10 @@ Resources:
           Value: !Ref AWS::Region
         - Name: AWS_ACCOUNT_ID
           Value: !Ref AWS::AccountId
+        - Name: IMAGE_REPO_NAME
+          Value: !Ref ContainterImageRepoName
+        - Name: IMAGE_TAG
+          Value: !Ref ContainterImageTag
       Source:
         Type: CODEPIPELINE
       TimeoutInMinutes: 60

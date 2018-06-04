@@ -3,15 +3,26 @@ phases:
   install:
     commands:
       - pip install --upgrade --user awscli
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - $(aws ecr get-login --no-include-email --region $AWS_DEFAULT_REGION)
   build:
     commands:
       - npm install time
       - cd src; npm install; cd ..
       - find src/node_modules -type f -print -exec touch {} \;  # ZIP does not support timestamps before 1980
+      - cd src; docker build -t $IMAGE_REPO_NAME:$IMAGE_TAG .; cd ..
+      - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
       - aws cloudformation package
          --template-file ./templates/template.yaml
          --s3-bucket $S3_BUCKET_NAME
          --output-template-file samTemplate.yaml
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo Pushing the Docker image...
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
 artifacts:
   type: zip
   files:

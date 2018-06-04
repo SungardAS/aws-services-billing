@@ -169,14 +169,13 @@ Resources:
     Properties:
       TemplateURL: "./batch.yaml"
       Parameters:
-        BucketIamRoleArn: !GetAtt BucketServiceIAMRole
+        BucketIamRoleArn: !GetAtt BucketServiceIAMRole.Arn
         RedshiftUser: !Ref RedshiftUser
         RedshiftPass: !Ref RedshiftPass
         SQLTableName: !Ref SQLTable
         RedshiftConnectionString: !Sub "${RedshiftCluster.Outputs.RedshiftConnectionString}"
         SubnetId: !Sub "${PrivateSubnet2.Outputs.SubnetId}"
         SecurityGroupId: !Sub "${SecurityGroups.Outputs.RedshiftSecurityGroupId}"
-        EcsInstanceRoleId:
   BucketServiceIAMRole:
     Type: "AWS::IAM::Role"
     Properties:

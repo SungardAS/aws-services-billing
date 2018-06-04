@@ -11,6 +11,10 @@ This creates a Redshift cluster where Billing report data is exported whenever t
 
 Input Parameter Values
 
+- ContainterImageRepoName: `sungardas/billing_import`
+
+- ContainterImageTag: `latest`
+
 - EncryptionLambdaName:
 
   Enter the `NAME (not ARN) of the encryption Lambda Function`. If you didn't already deployed the Encryption Lambda Function, see <a href="https://github.com/SungardAS/aws-services-encryption">here</a> to deploy the Lambda Function to Encrypt Environment Variables.
@@ -35,7 +39,7 @@ Input Parameter Values
 
   Second Private Cidr Block. Format: x.x.x.x/x
 
-- ProjectImage: `aws/codebuild/nodejs:6.3.1`
+- ProjectImage: `aws/codebuild/docker:17.09.0`
 
 - PublicCidr1:
 
